@@ -2,6 +2,7 @@
 # Copyright: Damien Elmes <anki@ichi2.net>
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+"""The window used to preview the different cards of a note."""
 import collections
 import re
 
@@ -19,7 +20,22 @@ from anki.hooks import runFilter
 
 
 class CardLayout(QDialog):
+    """TODO 
 
+    An object of class CardLayout contains:
+    nw -- the main window
+    parent -- the parent of the caller, by default the main window
+    note -- the note object considered
+    ord -- the order of the card considered
+    col -- the current collection
+    mm -- The model manager
+    model -- the model of the note
+    addMode -- if the card layout is called for a new card (in this case, it is temporary added to the db). True if its called from models.py, false if its called from edit.py
+    emptyFields -- the list of fields which are empty. Used only if addMode is true 
+    redrawing -- is it currently redrawing (forbid savecard and onCardSeleceted)
+    cards -- the list of cards of the current note, each with their template.
+    """
+    
     def __init__(self, mw, note, ord=0, parent=None, addMode=False):
         QDialog.__init__(self, parent or mw, Qt.Window)
         mw.setupDialogGC(self)
@@ -61,8 +77,12 @@ class CardLayout(QDialog):
         self.setFocus()
 
     def redraw(self):
+        """TODO
+        update the list of card
+        """
         self.cards = self.col.previewCards(self.note, 2)
-        idx = self.ord
+        #the list of cards of this note, with all templates
+        idx = self.ord#useless variable ?
         if idx >= len(self.cards):
             self.ord = len(self.cards) - 1
 
@@ -77,6 +97,7 @@ class CardLayout(QDialog):
             QShortcut(QKeySequence("Ctrl+%d" % i), self, activated=lambda i=i: self.selectCard(i))
 
     def selectCard(self, n):
+        """Change ord to n-1 and redraw."""
         self.ord = n-1
         self.redraw()
 
@@ -90,6 +111,7 @@ class CardLayout(QDialog):
 
     def updateTopArea(self):
         cnt = self.mw.col.models.useCount(self.model)
+        #number of notes using this model
         self.topAreaForm.changesLabel.setText(ngettext(
             "Changes below will affect the %(cnt)d note that uses this card type.",
             "Changes below will affect the %(cnt)d notes that use this card type.",
@@ -533,6 +555,7 @@ Enter deck to place new %s cards in, or leave blank:""") %
     ######################################################################
 
     def accept(self):
+        """Same as reject."""
         self.reject()
 
     def reject(self):

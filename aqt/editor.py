@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 # Copyright: Damien Elmes <anki@ichi2.net>
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+"""The part of the window used to edit notes. It is used for adding note, editing existing note, and as the lower part of the browser.
+"""
+
 import re
 import os
 import urllib.request, urllib.error, urllib.parse

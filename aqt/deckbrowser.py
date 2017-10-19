@@ -82,6 +82,7 @@ class DeckBrowser:
 """
 
     def _renderPage(self, reuse=False):
+        """The HTML of the deck browser."""
         if not reuse:
             self._dueTree = self.mw.col.sched.deckDueTree()
         tree = self._renderDeckTree(self._dueTree)
@@ -123,9 +124,15 @@ where id > ?""", (self.mw.col.sched.dayCutoff-86400)*1000)
                     "</div>")))
 
     def _renderDeckTree(self, nodes, depth=0):
+        """Html used to show the deck tree.
+
+        keyword arguments
+        depth -- the number of ancestors, excluding itself
+        nodes -- A list of nodes, to render, with the same parent"""
         if not nodes:
             return ""
         if depth == 0:
+            #Toplevel
             buf = """
 <tr><th colspan=5 align=left>%s</th><th class=count>%s</th>
 <th class=count>%s</th><th class=optscol></th></tr>""" % (
@@ -140,6 +147,12 @@ where id > ?""", (self.mw.col.sched.dayCutoff-86400)*1000)
         return buf
 
     def _deckRow(self, node, depth, cnt):
+        """The HTML for a single deck (and its descendant)
+
+        Keyword arguments:
+        depth -- indentation argument (number of ancestors)
+        cnt --  TODO
+        """
         name, did, due, lrn, new, children = node
         deck = self.mw.col.decks.get(did)
         if did == 1 and cnt > 1 and not children:

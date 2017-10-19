@@ -50,7 +50,45 @@ defaultConf = {
 
 # this is initialized by storage.Collection
 class _Collection:
+    """A collection is, basically, everything that composed an account in
+    Anki.
 
+    The collection is composed of: 
+    usn -- USN of the collection
+    id -- arbitrary number since there is only one row
+    crt -- created timestamp
+    mod -- last modified in milliseconds
+    scm -- schema mod time: time when "schema" was modified. 
+        --  If server scm is different from the client scm a full-sync is required
+    ver -- version
+    dty -- dirty: unused, set to 0
+    usn -- update sequence number: used for finding diffs when syncing. 
+        --   See usn in cards table for more details.
+    ls -- "last sync time"
+    conf -- json object containing configuration options that are synced
+    models -- the model manager
+    In the db: json array of json objects containing the models (aka Note types)
+    decks -- The deck manager
+          -- in the db  it is a json array of json objects containing the deck
+    dconf -- json array of json objects containing the deck options
+    tags -- a cache of tags used in the collection (probably for autocomplete etc)
+
+    not in the db:
+    activeDecks -- The active decks, that is, the current deck and its descendent. 
+    curDeck -- the current deck. That is, the last deck which was selected
+    for review or for adding cards. 
+    newSpread -- ??
+    collapseTime -- 
+    timeLim -- 
+    estTimes -- 
+    dueCounts -- 
+    other -- 
+    curModel -- A model which is, right now, the default model
+    nextPos -- the highest due of new cards
+    sortType -- 
+    sortBackwards -- 
+    addToCur -- add new to currently selected deck?
+    """
     def __init__(self, db, server=False, log=False):
         self._debugLog = log
         self.db = db
@@ -175,7 +213,16 @@ crt=?, mod=?, scm=?, dty=?, usn=?, ls=?, conf=?""",
         self.lock()
 
     def modSchema(self, check):
-        "Mark schema modified. Call this first so user can abort if necessary."
+        """Mark schema modified. Call this first so user can abort if necessary.
+
+        Raise AnkiError("abortSchemaMod") if the change is
+        rejected by the filter (e.g. if the user states to abort).
+
+        Once the change is accepted, the filter is not run until a
+        synchronization occurs.
+
+        Change the scm value
+        """
         if not self.schemaChanged():
             if check and not runFilter("modSchema", True):
                 raise AnkiError("abortSchemaMod")
@@ -212,9 +259,11 @@ crt=?, mod=?, scm=?, dty=?, usn=?, ls=?, conf=?""",
     ##########################################################################
 
     def getCard(self, id):
+        """The card object whose id is id."""
         return anki.cards.Card(self, id)
 
     def getNote(self, id):
+        """The note object whose id is id."""
         return anki.notes.Note(self, id=id)
 
     # Utils
@@ -265,6 +314,7 @@ crt=?, mod=?, scm=?, dty=?, usn=?, ls=?, conf=?""",
         return ncards
 
     def remNotes(self, ids):
+        """Removes all cards associated to the notes whose id is in ids"""
         self.remCards(self.db.list("select id from cards where nid in "+
                                    ids2str(ids)))
 
@@ -364,10 +414,14 @@ insert into cards values (?,?,?,?,?,?,0,0,?,0,0,0,0,0,0,0,0,"")""",
                             data)
         return rem
 
-    # type 0 - when previewing in add dialog, only non-empty
-    # type 1 - when previewing edit, only existing
-    # type 2 - when previewing in models dialog, all templates
     def previewCards(self, note, type=0):
+        """Returns a list of new cards, one by template. Those cards are not flushed, and their due is always 1.
+        
+        type 0 - when previewing in add dialog, only non-empty
+        type 1 - when previewing edit, only existing
+        type 2 - when previewing in models dialog, all templates.
+        """
+        #cms is the list of templates to consider
         if type == 0:
             cms = self.findTemplates(note)
         elif type == 1:
@@ -382,7 +436,18 @@ insert into cards values (?,?,?,?,?,?,0,0,?,0,0,0,0,0,0,0,0,"")""",
         return cards
 
     def _newCard(self, note, template, due, flush=True):
-        "Create a new card."
+        """A new card object belonging to this collection. 
+        Its nid according to note,
+        ord according to template
+        did according to template, or to model, or default if otherwise deck is dynamic
+        Cards is flushed or not according to flush parameter
+
+        keyword arguments:
+        note -- the note of this card
+        template -- the template of this card
+        due -- The due time of this card, assuming no random
+        flush -- whether this card should be push in the db
+        """
         card = anki.cards.Card(self)
         card.nid = note.id
         card.ord = template['ord']
@@ -404,6 +469,14 @@ insert into cards values (?,?,?,?,?,?,0,0,?,0,0,0,0,0,0,0,0,"")""",
         return card
 
     def _dueForDid(self, did, due):
+        """The due date of a card. Itself if not random mode. A random number
+        depending only on the due date otherwise.
+
+        keyword arguments
+        did -- the deck id of the considered card
+        due -- the due time of the considered card
+
+        """
         conf = self.decks.confForDid(did)
         # in order due?
         if conf['new']['order'] == NEW_CARDS_DUE:
@@ -419,13 +492,17 @@ insert into cards values (?,?,?,?,?,?,0,0,?,0,0,0,0,0,0,0,0,"")""",
     ##########################################################################
 
     def isEmpty(self):
+        """Is there no cards in this collection."""
         return not self.db.scalar("select 1 from cards limit 1")
 
     def cardCount(self):
         return self.db.scalar("select count() from cards")
 
     def remCards(self, ids, notes=True):
-        "Bulk delete cards by ID."
+        "Bulk delete cards by ID.
+
+        keyword arguments:
+        notes -- whether cards without note should be deleted."
         if not ids:
             return
         sids = ids2str(ids)
@@ -464,7 +541,7 @@ where c.nid = n.id and c.id in %s group by nid""" % ids2str(cids)):
             "select id, mid, flds from notes where id in "+snids)
 
     def updateFieldCache(self, nids):
-        "Update field checksums and sort cache, after find&replace, etc."
+        "Update field checksums and sort cache, after find&replace, changing model, etc."
         snids = ids2str(nids)
         r = []
         for (nid, mid, flds) in self._fieldData(snids):
@@ -484,6 +561,12 @@ where c.nid = n.id and c.id in %s group by nid""" % ids2str(cids)):
 
     def renderQA(self, ids=None, type="card"):
         # gather metadata
+        """TODO
+
+        The list of renderQA for each cards whose type belongs to ids. 
+
+        Types may be card(default), note, model or all (in this case, ids is not used).
+        """
         if type == "card":
             where = "and c.id in " + ids2str(ids)
         elif type == "note":
@@ -498,40 +581,62 @@ where c.nid = n.id and c.id in %s group by nid""" % ids2str(cids)):
                 for row in self._qaData(where)]
 
     def _renderQA(self, data, qfmt=None, afmt=None):
-        "Returns hash of id, question, answer."
-        # data is [cid, nid, mid, did, ord, tags, flds]
-        # unpack fields and create dict
-        flist = splitFields(data[6])
-        fields = {}
+        """Returns hash of id, question, answer.
+
+        Keyword arguments:        
+        data -- [cid, nid, mid, did, ord, tags, flds] (see db
+        documentation for more information about those values) 
+        This corresponds to the information you can obtain in templates, using {{Tags}}, {{Type}}, etc..
+        qfmt -- question format string (as in template)
+        afmt -- answer format string (as in template)
+
+        unpack fields and create dict
+        TODO comment better
+
+        """
+        flist = splitFields(data[6])#the list of fields
+        fields = {} #
+        #name -> ord for each field, tags
+        # Type: the name of the model,
+        # Deck, Subdeck: their name
+        # Card: the template name
+        # cn: 1 for n being the ord+1
+        # FrontSide : 
         model = self.models.get(data[2])
-        for (name, (idx, conf)) in list(self.models.fieldMap(model).items()):
+        for (name, (idx, conf)) in list(self.models.fieldMap(model).items()):#conf is not used
             fields[name] = flist[idx]
         fields['Tags'] = data[5].strip()
         fields['Type'] = model['name']
         fields['Deck'] = self.decks.name(data[3])
         fields['Subdeck'] = fields['Deck'].split('::')[-1]
-        if model['type'] == MODEL_STD:
+        if model['type'] == MODEL_STD:#model['type'] is distinct from fields['Type']
             template = model['tmpls'][data[4]]
-        else:
+        else:#for cloze deletions
             template = model['tmpls'][0]
         fields['Card'] = template['name']
         fields['c%d' % (data[4]+1)] = "1"
         # render q & a
         d = dict(id=data[0])
+        # id: card id
         qfmt = qfmt or template['qfmt']
         afmt = afmt or template['afmt']
         for (type, format) in (("q", qfmt), ("a", afmt)):
-            if type == "q":
+            if type == "q":#if/else is in the loop in order for d['q'] to be defined below
                 format = re.sub("{{(?!type:)(.*?)cloze:", r"{{\1cq-%d:" % (data[4]+1), format)
+                #Replace {{'foo'cloze: by {{'foo'cq-(ord+1), where 'foo' does not begins with "type:"
                 format = format.replace("<%cloze:", "<%%cq:%d:" % (
                     data[4]+1))
+                #Replace <%cloze: by <%%cq:(ord+1)
             else:
                 format = re.sub("{{(.*?)cloze:", r"{{\1ca-%d:" % (data[4]+1), format)
+                #Replace {{'foo'cloze: by {{'foo'ca-(ord+1)
                 format = format.replace("<%cloze:", "<%%ca:%d:" % (
                     data[4]+1))
+                #Replace <%cloze: by <%%ca:(ord+1)
                 fields['FrontSide'] = stripSounds(d['q'])
+                #d['q'] defined during loop's first iteration
             fields = runFilter("mungeFields", fields, model, data, self)
-            html = anki.template.render(format, fields)
+            html = anki.template.render(format, fields) #probably replace everything of the form {{ by its value
             d[type] = runFilter(
                 "mungeQA", html, type, fields, model, data, self)
             # empty cloze?
@@ -540,10 +645,16 @@ where c.nid = n.id and c.id in %s group by nid""" % ids2str(cids)):
                     d['q'] += ("<p>" + _(
                 "Please edit this note and add some cloze deletions. (%s)") % (
                 "<a href=%s#cloze>%s</a>" % (HELP_SITE, _("help"))))
+                    #in the case where there is a cloze note type
+                    #without {{cn in fields indicated by
+                    #{{cloze:fieldName; an error message should be
+                    #shown
         return d
 
     def _qaData(self, where=""):
-        "Return [cid, nid, mid, did, ord, tags, flds] db query"
+        """The list of [cid, nid, mid, did, ord, tags, flds] for each pair cards satisfying where.
+
+        Where should start with an and."""
         return self.db.execute("""
 select c.id, f.id, f.mid, c.did, c.ord, f.tags, f.flds
 from cards c, notes f
@@ -823,6 +934,15 @@ and queue = 0""", intTime(), self.usn())
     ##########################################################################
 
     def log(self, *args, **kwargs):
+        """Generate the string [time] path:fn(): args list
+
+        if args is not string, it is represented using pprint.pformat
+
+        if self._debugLog is True, it is hadded to _logHnd
+        if devMode is True, this string is printed
+
+        TODO look traceback/extract stack and fn
+        """
         if not self._debugLog:
             return
         def customRepr(x):

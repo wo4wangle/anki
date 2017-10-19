@@ -163,6 +163,19 @@ create table meta (dirMod int, lastUsn int); insert into meta values (0, 0);
     ##########################################################################
 
     def filesInStr(self, mid, string, includeRemote=False):
+        """The list of media's path in the string.
+        
+        Each clozes are expanded in every possible ways. It allows
+        for different strings to be created.
+
+        Concerning the part of the string related to LaTeX, media are
+        generated as explained in latex._imgLink's docstring
+
+        Keyword arguments:
+        mid -- the id of the model of the note whose string is considered
+        string -- A string, which corresponds to a field of a note
+        includeRemote -- whether the list should include contents which is with http, https or ftp
+        """
         l = []
         model = self.col.models.get(mid)
         strings = []
@@ -185,19 +198,29 @@ create table meta (dirMod int, lastUsn int); insert into meta values (0, 0);
         return l
 
     def _expandClozes(self, string):
+        """The list of all strings, where the clozes are expanded.
+
+        For each cloze number n, there is a string with cloze n replaced by [...] or by [hint], and every other clozes replaced by their text. 
+
+        There is also a text where each cloze are replaced by their value; i.e. the answer"""
         ords = set(re.findall("{{c(\d+)::.+?}}", string))
+        #The set of clozes occurring in the string
         strings = []
         from anki.template.template import clozeReg
         def qrepl(m):
+            """The text by which the cloze m must be replaced in the question."""
             if m.group(3):
                 return "[%s]" % m.group(3)
             else:
                 return "[...]"
         def arepl(m):
+            """The text by which the cloze m must be replaced in the answer."""
             return m.group(1)
         for ord in ords:
             s = re.sub(clozeReg%ord, qrepl, string)
+            #Replace the cloze number ord by the deletion
             s = re.sub(clozeReg%".+?", "\\2", s)
+            #Replace every other clozes by their content
             strings.append(s)
         strings.append(re.sub(clozeReg%".+?", arepl, string))
         return strings

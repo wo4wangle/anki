@@ -24,7 +24,22 @@ HTTP_BUF_SIZE = 64*1024
 
 class Syncer:
 
+    """The hook "sync" takes as parameter a string describing what is
+    going to be done. It seems that, by default, those hook are empty.
+
+    lmod -- last modified of the collection in milliseconds
+    rmod -- last modified of the collection in milliseconds
+    minUsn -- USN of the collection
+    col -- its collection
+    server -- the server. Object of class RemoteServer in pratice
+    syncMsg -- TODO
+    uname -- TODO
+
+    """
+
     def __init__(self, col, server=None):
+        """Save in the Syncer the value of the two parameters. """
+        #It is not clear what is done if server is None. But it never occurs in this code
         self.col = col
         self.server = server
 
@@ -122,6 +137,11 @@ class Syncer:
         return "success"
 
     def meta(self):
+        """A dictionnary with:
+        -mod, scm, usn according to col's data
+        -ts the actual time stamp
+        -musn, msg and cont, initialized to some default constant
+        """
         return dict(
             mod=self.col.mod,
             scm=self.col.scm,
@@ -458,7 +478,7 @@ class LocalServer(Syncer):
 ##########################################################################
 
 class AnkiRequestsClient:
-
+    """session"""
     def __init__(self):
         self.session = requests.Session()
 
@@ -497,7 +517,11 @@ class _MonitoringFile(io.BufferedReader):
 ##########################################################################
 
 class HttpSyncer:
-
+    """
+    hkey -- TODO
+    skey: a random  8 hexadecimal value
+    
+    """
     def __init__(self, hkey=None, client=None):
         self.hkey = hkey
         self.skey = checksum(str(random.random()))[:8]
@@ -694,6 +718,7 @@ class FullSyncer(HttpSyncer):
 class MediaSyncer:
 
     def __init__(self, col, server=None):
+        """Save in the Syncer the value of the two parameters"""
         self.col = col
         self.server = server
 
