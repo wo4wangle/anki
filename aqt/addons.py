@@ -201,6 +201,10 @@ When loading '%(name)s':
     _configButtonActions = {}
 
     def addonConfigDefaults(self, dir):
+        """The (default) configuration of the addon whose
+name/directory is dir.
+
+        This file should be called config.json"""
         path = os.path.join(self.addonsFolder(dir), "config.json")
         try:
             return json.load(open(path, encoding="utf8"))
@@ -208,6 +212,7 @@ When loading '%(name)s':
             return None
 
     def addonConfigHelp(self, dir):
+        """The configuration of this addon, obtained as configuration"""
         path = os.path.join(self.addonsFolder(dir), "config.md")
         if os.path.exists(path):
             return markdown.markdown(open(path).read())
@@ -215,6 +220,7 @@ When loading '%(name)s':
             return ""
 
     def addonFromModule(self, module):
+        """Returns the string of module before the first dot"""
         return module.split(".")[0]
 
     def configAction(self, addon):

@@ -150,8 +150,14 @@ where id > ?""", (self.mw.col.sched.dayCutoff-86400)*1000)
         """The HTML for a single deck (and its descendant)
 
         Keyword arguments:
+        node -- (name of the deck,
+                 its id,
+                 its number of due cards,
+                 number of cards in learning,
+                 its number of new cards
+                 its list of children)
         depth -- indentation argument (number of ancestors)
-        cnt --  TODO
+        cnt --  the number of sibling, counting itself
         """
         name, did, due, lrn, new, children = node
         deck = self.mw.col.decks.get(did)

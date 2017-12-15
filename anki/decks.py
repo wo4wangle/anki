@@ -4,15 +4,13 @@
 
 """This module deals with decks and their configurations.
 
-self.decks is the dictionnary associating an id to the deck with this id
-self.dconf is the dictionnary associating an id to the dconf with this id
 
-A deck object is composed of:
+A deck is an array composed of:
 newToday -- two number array used somehow for custom study, 
 revToday -- two number array used somehow for custom study, 
 lrnToday -- two number array used somehow for custom study, 
 timeToday -- two number array used somehow for custom study, 
-conf -- id of option group from dconf in `col` table, 
+conf -- (string) id of option group from dconf
 usn -- Update sequence number: used in same way as other usn vales in db
 desc -- deck description, it is shown when cards are learned or reviewd
 dyn -- 1 if dynamic (AKA filtered) deck, 
@@ -24,11 +22,11 @@ browserCollapsed -- true when deck collapsed in browser,
 id -- deck ID (automatically generated long), 
 mod -- last modification time, 
 mid -- the model of the deck
+"""
 
 
 
-
-A configuration of deck is composed of:
+"""A configuration of deck is a dictionnary composed of:
 name -- its name
 new -- The configuration for new cards, see below.
 lapse -- The configuration for lapse cards, see below.
@@ -42,7 +40,7 @@ played when the answer is shown
 mod -- Last modification time
 usn -- see USN documentation
 dyn -- Whether this deck is dynamic. Not present in the default configurations
-id -- deck ID (automatically generated long). Not present in the default configurations.
+id -- configuration ID (automatically generated long). Not present in the default configurations.
 
 The configuration related to new card is composed of:
 delays -- The list of successive delay between the learning steps of
@@ -163,7 +161,11 @@ defaultConf = {
 }
 
 class DeckManager:
-
+    """
+    col -- the collection associated to this Deck manager
+    decks -- associating to each id (as string) its deck
+    dconf -- associating to each id (as string) its configuration(option)
+    """
     # Registry save/load
     #############################################################
 
@@ -178,8 +180,8 @@ class DeckManager:
         999999 or correct this error.
 
         Keyword arguments:
-        decks -- the json of decks
-        dconf -- the json of deck configurations
+        decks -- json dic associating to each id (as string) its deck
+        dconf -- json dic associating to each id (as string) its configuration(option)
         """
         self.decks = json.loads(decks)
         self.dconf = json.loads(dconf)

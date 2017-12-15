@@ -53,7 +53,12 @@ class _Collection:
     """A collection is, basically, everything that composed an account in
     Anki.
 
-    The collection is composed of: 
+    This object is usually denoted col
+
+    _lastSave -- time of the last save. Initially time of creation.
+    _undo -- An undo object. See below
+    
+    The collection is an object composed of: 
     usn -- USN of the collection
     id -- arbitrary number since there is only one row
     crt -- created timestamp
@@ -65,14 +70,21 @@ class _Collection:
     usn -- update sequence number: used for finding diffs when syncing. 
         --   See usn in cards table for more details.
     ls -- "last sync time"
-    conf -- json object containing configuration options that are synced
+    conf -- object containing configuration options that are synced
+"""
+
+    """
+    In the db, not in col objects
+
     models -- the model manager
     In the db: json array of json objects containing the models (aka Note types)
     decks -- The deck manager
           -- in the db  it is a json array of json objects containing the deck
     dconf -- json array of json objects containing the deck options
     tags -- a cache of tags used in the collection (probably for autocomplete etc)
+    """
 
+    """
     not in the db:
     activeDecks -- The active decks, that is, the current deck and its descendent. 
     curDeck -- the current deck. That is, the last deck which was selected
@@ -88,6 +100,13 @@ class _Collection:
     sortType -- 
     sortBackwards -- 
     addToCur -- add new to currently selected deck?
+    """
+
+    """An undo object is of the form     
+    [type, undoName, data]
+    Here, type is 1 for review, 2 for checkpoint. 
+    undoName is the name of the action to undo. Used in the edit menu,
+    and in tooltip stating that undo was done.
     """
     def __init__(self, db, server=False, log=False):
         self._debugLog = log
@@ -225,6 +244,7 @@ crt=?, mod=?, scm=?, dty=?, usn=?, ls=?, conf=?""",
         """
         if not self.schemaChanged():
             if check and not runFilter("modSchema", True):
+                #default hook is added in aqt/main setupHooks. It is function onSchemaMod from class AnkiQt aqt/main 
                 raise AnkiError("abortSchemaMod")
         self.scm = intTime(1000)
         self.setMod()
@@ -502,7 +522,7 @@ insert into cards values (?,?,?,?,?,?,0,0,?,0,0,0,0,0,0,0,0,"")""",
         "Bulk delete cards by ID.
 
         keyword arguments:
-        notes -- whether cards without note should be deleted."
+        notes -- whether note without cards should be deleted."
         if not ids:
             return
         sids = ids2str(ids)
@@ -705,19 +725,27 @@ where c.nid == f.id
 
     # Undo
     ##########################################################################
+    # [type, undoName, data]
+    # type 1 = review; type 2 = checkpoint
 
     def clearUndo(self):
-        # [type, undoName, data]
-        # type 1 = review; type 2 = checkpoint
+        """Erase all undo information from the collection."""
         self._undo = None
 
     def undoName(self):
-        "Undo menu item name, or None if undo unavailable."
+        """The name of the action which could potentially be undone.
+
+        None if nothing can be undone. This let test whether something
+        can be undone.
+        """
         if not self._undo:
             return None
         return self._undo[1]
 
     def undo(self):
+        "Undo the last operation.
+
+        Assuming an undo object exists."""
         if self._undo[0] == 1:
             return self._undoReview()
         else:
@@ -729,7 +757,7 @@ where c.nid == f.id
             if self._undo[0] == 1:
                 old = self._undo[2]
             self.clearUndo()
-        wasLeech = card.note().hasTag("leech") or False
+        wasLeech = card.note().hasTag("leech") or False#The or is probably useless.
         self._undo = [1, _("Review"), old + [copy.copy(card)], wasLeech]
 
     def _undoReview(self):

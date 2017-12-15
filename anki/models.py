@@ -4,11 +4,11 @@
 
 """This module deals with models, known as note type in Anki's documentation.
 
-A model is composed of:
+A model is a dic composed of:
 css -- CSS, shared for all templates of the model
 did -- Long specifying the id of the deck that cards are added to by
 default
-flds -- JSONArray containing object for each field in the model. See flds
+flds -- A list of field objects. See below. Json in the database
 id -- model ID, matches notes.mid
 latexPost -- String added to end of LaTeX expressions (usually \\end{document}),
 latexPre -- preamble for LaTeX expressions,
@@ -28,10 +28,10 @@ usn -- Update sequence number: used in same way as other usn vales in
 db,
 vers -- Legacy version number (unused), use an empty array []
 changed -- Whether the Model has been changed and should be written in
-the database.
+the database."""
 
 
-A flds is composed of:
+"""A field object is an array composed of:
 font -- "display font",
 media -- "array of media. appears to be unused",
 name -- "field name",
@@ -39,16 +39,16 @@ ord -- "ordinal of the field - goes from 0 to num fields -1",
 rtl -- "boolean, right-to-left script",
 size -- "font size",
 sticky -- "sticky fields retain the value that was last added 
-when adding new notes"
+when adding new notes" """
 
-req' fields are:
+"""req' fields are:
 "the 'ord' value of the template object from the 'tmpls' array you are setting the required fields of",
 '? string, "all" or "any"',
 ["? another array of 'ord' values from field object you
-want to require from the 'flds' array"]
+want to require from the 'flds' array"]"""
 
 
-tmpls's field are:
+"""tmpls's field are:
 afmt -- "answer template string",
 bafmt -- "browser answer format: 
 used for displaying answer in browser",
@@ -128,7 +128,8 @@ defaultTemplate = {
 }
 
 class ModelManager:
-
+    """This object is usually denoted mm as a variable. Or .models in
+    collection."""
     # Saving/loading registry
     #############################################################
 
@@ -573,6 +574,8 @@ select id from notes where mid = ?)""" % " ".join(map),
         """Change the note whose ids are nid to the model newModel, reorder
         fields according to map. Write the change in the database
 
+        Note that if a field is mapped to nothing, it is lost
+        
         keyword arguments:
         nids -- the list of id of notes to change
         newmodel -- the model of destination of the note
