@@ -22,15 +22,19 @@ import aqt.webview
 import aqt.toolbar
 import aqt.stats
 import aqt.mediasrv
+from aqt.utils import showWarning
+import anki.sound
+import anki.mpv
 from aqt.utils import saveGeom, restoreGeom, showInfo, showWarning, \
     restoreState, getOnlyText, askUser, applyStyles, showText, tooltip, \
     openHelp, openLink, checkInvalidFilename, getFile
 import sip
 
 class AnkiQt(QMainWindow):
-    def __init__(self, app, profileManager, args):
+    def __init__(self, app, profileManager, opts, args):
         QMainWindow.__init__(self)
         self.state = "startup"
+        self.opts = opts
         aqt.mw = self
         self.app = app
         self.pm = profileManager
@@ -67,6 +71,7 @@ class AnkiQt(QMainWindow):
         self.setupKeys()
         self.setupThreads()
         self.setupMediaServer()
+        self.setupSound()
         self.setupMainWindow()
         self.setupSystemSpecific()
         self.setupStyle()
@@ -294,7 +299,19 @@ close the profile or restart Anki."""))
     def cleanupAndExit(self):
         self.errorHandler.unload()
         self.mediaServer.shutdown()
+        anki.sound.cleanupMPV()
         self.app.exit(0)
+
+    # Sound/video
+    ##########################################################################
+
+    def setupSound(self):
+        try:
+            anki.sound.setupMPV()
+        except FileNotFoundError:
+            print("mpv not found, reverting to mplayer")
+        except anki.mpv.MPVProcessError:
+            print("mpv too old, reverting to mplayer")
 
     # Collection load/unload
     ##########################################################################
@@ -314,6 +331,7 @@ Debug info:
             self.showProfileManager()
             return False
 
+        self.setEnabled(True)
         self.progress.setupDB(self.col.db)
         self.maybeEnableUndo()
         self.moveToState("deckBrowser")
@@ -321,6 +339,7 @@ Debug info:
 
     def unloadCollection(self, onsuccess):
         def callback():
+            self.setEnabled(False)
             self._unloadCollection()
             onsuccess()
 
@@ -386,7 +405,8 @@ from the profile screen."))
         # do backup
         fname = time.strftime("backup-%Y-%m-%d-%H.%M.%S.colpkg", time.localtime(time.time()))
         newpath = os.path.join(dir, fname)
-        data = open(path, "rb").read()
+        with open(path, "rb") as f:
+            data = f.read()
         b = self.BackupThread(newpath, data)
         b.start()
 
@@ -394,7 +414,7 @@ from the profile screen."))
         backups = []
         for file in os.listdir(dir):
             # only look for new-style format
-            m = re.match("backup-\d{4}-\d{2}-.+.colpkg", file)
+            m = re.match(r"backup-\d{4}-\d{2}-.+.colpkg", file)
             if not m:
                 continue
             backups.append(file)
@@ -404,7 +424,7 @@ from the profile screen."))
         while len(backups) > nbacks:
             fname = backups.pop(0)
             path = os.path.join(dir, fname)
-            send2trash(path)
+            os.unlink(path)
 
     def maybeOptimize(self):
         # have two weeks passed?
@@ -1158,7 +1178,7 @@ will be lost. Continue?"""))
         tgt = tgt or self
         for action in tgt.findChildren(QAction):
             txt = str(action.text())
-            m = re.match("^(.+)\(&.+\)(.+)?", txt)
+            m = re.match(r"^(.+)\(&.+\)(.+)?", txt)
             if m:
                 action.setText(m.group(1) + (m.group(2) or ""))
 

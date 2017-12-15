@@ -4,13 +4,13 @@
 
 import difflib
 import re
-import cgi
+import html
 import unicodedata as ucd
 import html.parser
 
 from anki.lang import _, ngettext
 from aqt.qt import *
-from anki.utils import stripHTML, json
+from anki.utils import stripHTML, json, bodyClass
 from anki.hooks import addHook, runHook, runFilter
 from anki.sound import playFromText, clearAudioQueue, play
 from aqt.utils import mungeQA, tooltip, askUserDialog, \
@@ -159,17 +159,15 @@ class Reviewer:
         if c.isEmpty():
             q = _("""\
 The front of this card is empty. Please run Tools>Empty Cards.""")
-            a = ""
         else:
             q = c.q()
-            a = c.a()
         if self.autoplay(c):
             playFromText(q)
         # render & update bottom
         q = self._mungeQA(q)
         q = runFilter("prepareQA", q, c, "reviewQuestion")
 
-        bodyclass = "card card%d" % (c.ord+1)
+        bodyclass = bodyClass(self.mw.col, c)
 
         self.web.eval("_showQuestion(%s,'%s');" % (json.dumps(q), bodyclass))
         self._drawFlag()
@@ -208,6 +206,7 @@ The front of this card is empty. Please run Tools>Empty Cards.""")
         c = self.card
         a = c.a()
         # play audio?
+        clearAudioQueue()
         if self.autoplay(c):
             playFromText(a)
         a = self._mungeQA(a)
@@ -386,11 +385,7 @@ Please run Tools>Empty Cards""")
         # compare in NFC form so accents appear correct
         given = ucd.normalize("NFC", given)
         correct = ucd.normalize("NFC", correct)
-        try:
-            s = difflib.SequenceMatcher(None, given, correct, autojunk=False)
-        except:
-            # autojunk was added in python 2.7.1
-            s = difflib.SequenceMatcher(None, given, correct)
+        s = difflib.SequenceMatcher(None, given, correct, autojunk=False)
         givenElems = []
         correctElems = []
         givenPoint = 0
@@ -421,11 +416,11 @@ Please run Tools>Empty Cards""")
         "Diff-corrects the typed-in answer."
         givenElems, correctElems = self.tokenizeComparison(given, correct)
         def good(s):
-            return "<span class=typeGood>"+cgi.escape(s)+"</span>"
+            return "<span class=typeGood>"+html.escape(s)+"</span>"
         def bad(s):
-            return "<span class=typeBad>"+cgi.escape(s)+"</span>"
+            return "<span class=typeBad>"+html.escape(s)+"</span>"
         def missed(s):
-            return "<span class=typeMissed>"+cgi.escape(s)+"</span>"
+            return "<span class=typeMissed>"+html.escape(s)+"</span>"
         if given == correct:
             res = good(given)
         else:
@@ -448,7 +443,7 @@ Please run Tools>Empty Cards""")
         self.web.evalWithCallback("typeans ? typeans.value : null", self._onTypedAnswer)
 
     def _onTypedAnswer(self, val):
-        self.typedAnswer = val
+        self.typedAnswer = val or ""
         self._showAnswer()
 
     # Bottom bar
@@ -535,7 +530,6 @@ time = %(time)d;
             return l + ((2, _("Hard")), (3, _("Good")), (4, _("Easy")))
 
     def _answerButtons(self):
-        times = []
         default = self._defaultEase()
         def but(i, label):
             if i == default:
@@ -599,7 +593,7 @@ time = %(time)d;
         m = QMenu(self.mw)
         self._addMenuItems(m, opts)
 
-        runHook("Reviewer.contextMenuEvent",self,m)
+        runHook("Reviewer.contextMenuEvent", self, m)
         m.exec_(QCursor.pos())
 
     def _addMenuItems(self, m, rows):

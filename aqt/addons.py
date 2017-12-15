@@ -39,7 +39,7 @@ class AddonManager:
 
     def managedAddons(self):
         return [d for d in self.allAddons()
-                if re.match("^\d+$", d)]
+                if re.match(r"^\d+$", d)]
 
     def addonsFolder(self, dir=None):
         root = self.mw.pm.addonFolder()
@@ -76,13 +76,15 @@ When loading '%(name)s':
     def addonMeta(self, dir):
         path = self._addonMetaPath(dir)
         try:
-            return json.load(open(path, encoding="utf8"))
+            with open(path, encoding="utf8") as f:
+                return json.load(f)
         except:
             return dict()
 
     def writeAddonMeta(self, dir, meta):
         path = self._addonMetaPath(dir)
-        json.dump(meta, open(path, "w", encoding="utf8"))
+        with open(path, "w", encoding="utf8") as f:
+            json.dump(meta, f)
 
     def toggleEnabled(self, dir):
         meta = self.addonMeta(dir)
@@ -207,7 +209,8 @@ name/directory is dir.
         This file should be called config.json"""
         path = os.path.join(self.addonsFolder(dir), "config.json")
         try:
-            return json.load(open(path, encoding="utf8"))
+            with open(path, encoding="utf8") as f:
+                return json.load(f)
         except:
             return None
 
@@ -215,7 +218,8 @@ name/directory is dir.
         """The configuration of this addon, obtained as configuration"""
         path = os.path.join(self.addonsFolder(dir), "config.md")
         if os.path.exists(path):
-            return markdown.markdown(open(path).read())
+            with open(path) as f:
+                return markdown.markdown(f.read())
         else:
             return ""
 
@@ -331,7 +335,7 @@ class AddonsDialog(QDialog):
         addon = self.onlyOneSelected()
         if not addon:
             return
-        if re.match("^\d+$", addon):
+        if re.match(r"^\d+$", addon):
             openLink(aqt.appShared + f"info/{addon}")
         else:
             showWarning(_("Add-on was not downloaded from AnkiWeb."))
@@ -354,7 +358,9 @@ class AddonsDialog(QDialog):
         selected = self.selectedAddons()
         if not selected:
             return
-        if not askUser(_("Delete the %(num)d selected add-ons?") %
+        if not askUser(ngettext("Delete the %(num)d selected add-on?",
+                                "Delete the %(num)d selected add-ons?",
+                                len(selected)) %
                                dict(num=len(selected))):
             return
         for dir in selected:

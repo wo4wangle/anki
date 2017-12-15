@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import sys, traceback
-import cgi
+import html
 
 from anki.lang import _
 from aqt.qt import *
@@ -62,7 +62,7 @@ not able to correct them automatically. Please search for 'temp folder' in the \
 Anki manual for more information.""")
 
     def onTimeout(self):
-        error = cgi.escape(self.pool)
+        error = html.escape(self.pool)
         self.pool = ""
         self.mw.progress.clear()
         if "abortSchemaMod" in error:
@@ -72,7 +72,7 @@ Anki manual for more information.""")
         if "Pyaudio not" in error:
             return showWarning(_("Please install PyAudio"))
         if "install mplayer" in error:
-            return showWarning(_("Please install mplayer"))
+            return showWarning(_("Sound and video on cards will not function until mpv or mplayer is installed."))
         if "no default input" in error.lower():
             return showWarning(_("Please connect a microphone, and ensure "
                                  "other programs are not using the audio device."))

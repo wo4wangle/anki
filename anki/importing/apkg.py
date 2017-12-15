@@ -14,7 +14,8 @@ class AnkiPackageImporter(Anki2Importer):
         self.zip = z = zipfile.ZipFile(self.file)
         col = z.read("collection.anki2")
         colpath = tmpfile(suffix=".anki2")
-        open(colpath, "wb").write(col)
+        with open(colpath, "wb") as f:
+            f.write(col)
         self.file = colpath
         # we need the media dict in advance, and we'll need a map of fname ->
         # number to use during the import
@@ -25,7 +26,7 @@ class AnkiPackageImporter(Anki2Importer):
             if os.path.commonprefix([path, dir]) != dir:
                 raise Exception("Invalid file")
 
-            self.nameToNum[v] = unicodedata.normalize("NFC", k)
+            self.nameToNum[unicodedata.normalize("NFC",v)] = k
         # run anki2 importer
         Anki2Importer.run(self)
         # import static media
@@ -34,7 +35,8 @@ class AnkiPackageImporter(Anki2Importer):
                 continue
             path = os.path.join(self.col.media.dir(), file)
             if not os.path.exists(path):
-                open(path, "wb").write(z.read(c))
+                with open(path, "wb") as f:
+                    f.write(z.read(c))
 
     def _srcMediaData(self, fname):
         if fname in self.nameToNum:

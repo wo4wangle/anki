@@ -3,7 +3,7 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 import sre_constants
-import cgi
+import html
 import time
 import re
 from operator import  itemgetter
@@ -13,8 +13,9 @@ import json
 from aqt.qt import *
 import anki
 import aqt.forms
-from anki.utils import fmtTimeSpan, ids2str, stripHTMLMedia, htmlToTextLine, isWin, intTime,\
-    isMac, isLin
+from anki.utils import fmtTimeSpan, ids2str, stripHTMLMedia, htmlToTextLine, \
+    isWin, intTime, \
+    isMac, isLin, bodyClass
 from aqt.utils import saveGeom, restoreGeom, saveSplitter, restoreSplitter, \
     saveHeader, restoreHeader, saveState, restoreState, applyStyles, getTag, \
     showInfo, askUser, tooltip, openHelp, showWarning, shortcut, mungeQA, \
@@ -22,7 +23,8 @@ from aqt.utils import saveGeom, restoreGeom, saveSplitter, restoreSplitter, \
 from anki.hooks import runHook, addHook, remHook, runFilter
 from aqt.webview import AnkiWebView
 from anki.consts import *
-from anki.sound import playFromText, clearAudioQueue
+from anki.sound import playFromText, clearAudioQueue, allSounds, play
+
 
 # Data model
 ##########################################################################
@@ -1346,22 +1348,31 @@ where id in %s""" % ids2str(sf))
             txt = _("(please select 1 card)")
             bodyclass = ""
         else:
-            if self._previewBothSides:
-                self._previewState = "answer"
-            elif cardChanged:
-                self._previewState = "question"
             # need to force reload even if answer
             txt = c.q(reload=True)
+
+            questionAudio = []
+            if self._previewBothSides:
+                self._previewState = "answer"
+                questionAudio = allSounds(txt)
+            elif cardChanged:
+                self._previewState = "question"
             if self._previewState == "answer":
                 func = "_showAnswer"
                 txt = c.a()
             txt = re.sub("\[\[type:[^]]+\]\]", "", txt)
 
-            bodyclass="card card%d" % (c.ord+1)
+            bodyclass = bodyClass(self.mw.col, c)
 
             clearAudioQueue()
             if self.mw.reviewer.autoplay(c):
-                playFromText(txt)
+                # if we're showing both sides at once, play question audio first
+                for audio in questionAudio:
+                    play(audio)
+                # then play any audio that hasn't already been played
+                for audio in allSounds(txt):
+                    if audio not in questionAudio:
+                        play(audio)
 
             txt = mungeQA(self.col, txt)
             txt = runFilter("prepareQA", txt, c,
@@ -1739,7 +1750,7 @@ update cards set usn=?, mod=?, did=? where id in """ + scids,
             t += '''<li><a href=# onclick="pycmd('%s')">%s</a>: %s</a>''' % (
                 "nid:" + ",".join(str(id) for id in nids),
                 ngettext("%d note", "%d notes", len(nids)) % len(nids),
-                cgi.escape(val))
+                html.escape(val))
         t += "</ol>"
         t += "</body></html>"
         web.setHtml(t)

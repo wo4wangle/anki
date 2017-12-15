@@ -479,6 +479,7 @@ class LocalServer(Syncer):
 
 class AnkiRequestsClient:
     """session"""
+    verify = True
     def __init__(self):
         self.session = requests.Session()
 
@@ -486,13 +487,13 @@ class AnkiRequestsClient:
         data = _MonitoringFile(data)
         headers['User-Agent'] = self._agentName()
         return self.session.post(
-            url, data=data, headers=headers, stream=True, timeout=60)
+            url, data=data, headers=headers, stream=True, timeout=60, verify=self.verify)
 
     def get(self, url, headers=None):
         if headers is None:
             headers = {}
         headers['User-Agent'] = self._agentName()
-        return self.session.get(url, stream=True, timeout=60)
+        return self.session.get(url, stream=True, timeout=60, verify=self.verify)
 
     def streamContent(self, resp):
         resp.raise_for_status()

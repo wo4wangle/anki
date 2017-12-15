@@ -27,6 +27,7 @@ from aqt.utils import shortcut, showInfo, showWarning, getFile, \
     openHelp, tooltip, downArrow
 import aqt
 from bs4 import BeautifulSoup
+import requests
 
 pics = ("jpg", "jpeg", "png", "tif", "tiff", "gif", "svg", "webp")
 audio =  ("wav", "mp3", "ogg", "flac", "mp4", "swf", "mov", "mpeg", "mkv", "m4a", "3gp", "spx", "oga")
@@ -53,8 +54,8 @@ class Editor:
         # current card, for card layout
         self.card = None
         self.setupOuter()
-        self.setupShortcuts()
         self.setupWeb()
+        self.setupShortcuts()
         self.setupTags()
 
     # Initial setup
@@ -130,7 +131,7 @@ class Editor:
 
 
     def addButton(self, icon, cmd, func, tip="", label="", 
-                  id=None, toggleable=False, keys=None):
+                  id=None, toggleable=False, keys=None, disables=True):
         """Assign func to bridge cmd, register shortcut, return button"""
         if cmd not in self._links:
             self._links[cmd] = func
@@ -138,10 +139,11 @@ class Editor:
             QShortcut(QKeySequence(keys), self.widget,
                       activated = lambda s=self: func(s))
         btn = self._addButton(icon, cmd, tip=tip, label=label,
-                              id=id, toggleable=toggleable)
+                              id=id, toggleable=toggleable, disables=disables)
         return btn
 
-    def _addButton(self, icon, cmd, tip="", label="", id=None, toggleable=False):
+    def _addButton(self, icon, cmd, tip="", label="", id=None, toggleable=False,
+                   disables=True):
         if icon:
             if os.path.isabs(icon):
                 iconstr = self.resourceToData(icon)
@@ -163,16 +165,20 @@ class Editor:
         else:
             toggleScript = ''
         tip = shortcut(tip)
-        return ('''<button tabindex=-1 {id} class=linkb type="button" title="{tip}"'''
+        theclass = "linkb"
+        if not disables:
+            theclass += " perm"
+        return ('''<button tabindex=-1 {id} class="{theclass}" type="button" title="{tip}"'''
                 ''' onclick="pycmd('{cmd}');{togglesc}return false;">'''
                 '''{imgelm}{labelelm}</button>'''.format(
                         imgelm=imgelm, cmd=cmd, tip=tip, labelelm=labelelm, id=idstr,
-                        togglesc=toggleScript)
+                        togglesc=toggleScript, theclass=theclass)
                 )
 
     def setupShortcuts(self):
+        # if a third element is provided, enable shortcut even when no field selected
         cuts = [
-            ("Ctrl+L", self.onCardLayout),
+            ("Ctrl+L", self.onCardLayout, True),
             ("Ctrl+B", self.toggleBold),
             ("Ctrl+I", self.toggleItalic),
             ("Ctrl+U", self.toggleUnderline),
@@ -191,11 +197,23 @@ class Editor:
             ("Ctrl+M, M", self.insertMathjaxInline),
             ("Ctrl+M, E", self.insertMathjaxBlock),
             ("Ctrl+Shift+X", self.onHtmlEdit),
-            ("Ctrl+Shift+T", self.onFocusTags)
+            ("Ctrl+Shift+T", self.onFocusTags, True)
         ]
         runHook("setupEditorShortcuts", cuts, self)
-        for keys, fn in cuts:
+        for row in cuts:
+            if len(row) == 2:
+                keys, fn = row
+                fn = self._addFocusCheck(fn)
+            else:
+                keys, fn, _ = row
             QShortcut(QKeySequence(keys), self.widget, activated=fn)
+
+    def _addFocusCheck(self, fn):
+        def checkFocus():
+            if self.currentField is None:
+                return
+            fn()
+        return checkFocus
 
     def onFields(self):
         self.saveNow(self._onFields)
@@ -247,7 +265,7 @@ class Editor:
                     "editFocusLost", False, self.note, ord):
                     # something updated the note; update it after a subsequent focus
                     # event has had time to fire
-                    self.mw.progress.timer(100, self.loadNote, False)
+                    self.mw.progress.timer(100, self.loadNoteKeepingFocus, False)
                 else:
                     self.checkValid()
             else:
@@ -281,6 +299,9 @@ class Editor:
             if hide:
                 self.widget.hide()
 
+    def loadNoteKeepingFocus(self):
+        self.loadNote(self.currentField)
+
     def loadNote(self, focusTo=None):
         if not self.note:
             return
@@ -300,13 +321,10 @@ class Editor:
                 self.web.setFocus()
             runHook("loadNote", self)
 
-        self.web.evalWithCallback("setFields(%s, %s); setFonts(%s); focusField(%s)" % (
-            json.dumps(data), json.dumps(self.prewrapMode()),
+        self.web.evalWithCallback("setFields(%s); setFonts(%s); focusField(%s)" % (
+            json.dumps(data),
             json.dumps(self.fonts()), json.dumps(focusTo)),
                                   oncallback)
-
-    def prewrapMode(self):
-        return self.note.model().get('prewrap', False)
 
     def fonts(self):
         return [(f['font'], f['size'], f['rtl'])
@@ -563,13 +581,14 @@ to a cloze type first, via Edit>Change Note Type."""))
             name = urllib.parse.quote(fname.encode("utf8"))
             return '<img src="%s">' % name
         else:
+            anki.sound.clearAudioQueue()
             anki.sound.play(fname)
             return '[sound:%s]' % fname
 
     def urlToFile(self, url):
         l = url.lower()
         for suffix in pics+audio:
-            if l.endswith(suffix):
+            if l.endswith("." + suffix):
                 return self._retrieveURL(url)
         # not a supported type
         return
@@ -589,60 +608,89 @@ to a cloze type first, via Edit>Change Note Type."""))
         if url.lower().startswith("file://"):
             url = url.replace("%", "%25")
             url = url.replace("#", "%23")
+            local = True
+        else:
+            local = False
         # fetch it into a temporary folder
         self.mw.progress.start(
             immediate=True, parent=self.parentWindow)
+        ct = None
         try:
-            req = urllib.request.Request(url, None, {
-                'User-Agent': 'Mozilla/5.0 (compatible; Anki)'})
-            filecontents = urllib.request.urlopen(req).read()
+            if local:
+                req = urllib.request.Request(url, None, {
+                    'User-Agent': 'Mozilla/5.0 (compatible; Anki)'})
+                filecontents = urllib.request.urlopen(req).read()
+            else:
+                r = requests.get(url, timeout=30)
+                if r.status_code != 200:
+                    showWarning(_("Unexpected response code: %s") % r.status_code)
+                    return
+                filecontents = r.content
+                ct = r.headers.get("content-type")
         except urllib.error.URLError as e:
+            showWarning(_("An error occurred while opening %s") % e)
+            return
+        except requests.exceptions.RequestException as e:
             showWarning(_("An error occurred while opening %s") % e)
             return
         finally:
             self.mw.progress.finish()
+        # strip off any query string
+        url = re.sub("\?.*?$", "", url)
         path = urllib.parse.unquote(url)
-        return self.mw.col.media.writeData(path, filecontents)
+        return self.mw.col.media.writeData(path, filecontents, typeHint=ct)
 
     # Paste/drag&drop
     ######################################################################
 
     removeTags = ["script", "iframe", "object", "style"]
 
-    def _pastePreFilter(self, html):
+    def _pastePreFilter(self, html, internal):
         with warnings.catch_warnings() as w:
             warnings.simplefilter('ignore', UserWarning)
             doc = BeautifulSoup(html, "html.parser")
 
-        for tag in self.removeTags:
-            for node in doc(tag):
-                node.decompose()
+        if not internal:
+            for tag in self.removeTags:
+                for node in doc(tag):
+                    node.decompose()
 
-        if not self.prewrapMode():
-          # convert p tags to divs
-          for node in doc("p"):
-              node.name = "div"
+            # convert p tags to divs
+            for node in doc("p"):
+                node.name = "div"
 
         for tag in doc("img"):
             try:
-                if self.isURL(tag['src']):
-                    # convert remote image links to local ones
-                    fname = self.urlToFile(tag['src'])
-                    if fname:
-                        tag['src'] = fname
+                src = tag['src']
             except KeyError:
                 # for some bizarre reason, mnemosyne removes src elements
                 # from missing media
-                pass
+                continue
+
+            # in internal pastes, rewrite mediasrv references to relative
+            if internal:
+                m = re.match("http://127.0.0.1:\d+/(.*)$", src)
+                if m:
+                    tag['src'] = m.group(1)
+            else:
+                # in external pastes, download remote media
+                if self.isURL(src):
+                    fname = self._retrieveURL(src)
+                    if fname:
+                        tag['src'] = fname
 
         html = str(doc)
         return html
 
     def doPaste(self, html, internal):
-        if not internal:
-            html = self._pastePreFilter(html)
-        self.web.eval("pasteHTML(%s, %s);" % (
-            json.dumps(html), json.dumps(internal)))
+        html = self._pastePreFilter(html, internal)
+        extended = self.mw.app.queryKeyboardModifiers() & Qt.ShiftModifier
+        if extended:
+            extended = "true"
+        else:
+            extended = "false"
+        self.web.eval("pasteHTML(%s, %s, %s);" % (
+            json.dumps(html), json.dumps(internal), extended))
 
     def doDrop(self, html, internal):
         self.web.evalWithCallback("makeDropTargetCurrent();",
@@ -837,6 +885,8 @@ class EditorWebView(AnkiWebView):
         # hash and rename
         csum = checksum(open(path, "rb").read())
         newpath = "{}-{}{}".format(uname, csum, ext)
+        if os.path.exists(newpath):
+            os.unlink(newpath)
         os.rename(path, newpath)
 
         # add to media and return resulting html link

@@ -1,7 +1,6 @@
 var currentField = null;
 var changeTimer = null;
 var dropTarget = null;
-var prewrapMode = false;
 
 String.prototype.format = function () {
     var args = arguments;
@@ -27,15 +26,10 @@ function onKey() {
         currentField.blur();
         return;
     }
-    // catch enter key in prewrap mode
-    if (window.event.which === 13 && prewrapMode) {
-        window.event.preventDefault();
-        insertNewline();
-        return;
-    }
     // shift+tab goes to previous field
     if (navigator.platform === "MacIntel" &&
         window.event.which === 9 && window.event.shiftKey) {
+        window.event.preventDefault();
         focusPrevious();
         return;
     }
@@ -175,6 +169,9 @@ function onDragOver(elem) {
 
 function makeDropTargetCurrent() {
     dropTarget.focus();
+    // the focus event may not fire if the window is not active, so make sure
+    // the current field is set
+    currentField = dropTarget;
 }
 
 function onPaste(elem) {
@@ -220,7 +217,7 @@ function wrappedExceptForWhitespace(text, front, back) {
 }
 
 function disableButtons() {
-    $("button.linkb").prop("disabled", true);
+    $("button.linkb:not(.perm)").prop("disabled", true);
 }
 
 function enableButtons() {
@@ -263,7 +260,7 @@ function onCutOrCopy() {
     return true;
 }
 
-function setFields(fields, prewrap) {
+function setFields(fields) {
     var txt = "";
     for (var i = 0; i < fields.length; i++) {
         var n = fields[i][0];
@@ -279,12 +276,8 @@ function setFields(fields, prewrap) {
         txt += "contentEditable=true class=field>{0}</div>".format(f);
         txt += "</td></tr>";
     }
-    $("#fields").html("<table cellpadding=0 width=100%>" + txt + "</table>");
+    $("#fields").html("<table cellpadding=0 width=100% style='table-layout: fixed;'>" + txt + "</table>");
     maybeDisableButtons();
-    prewrapMode = prewrap;
-    if (prewrap) {
-        $(".field").addClass("prewrap");
-    }
 }
 
 function setBackgrounds(cols) {
@@ -310,73 +303,70 @@ function hideDupes() {
     $("#dupes").hide();
 }
 
-var pasteHTML = function (html, internal) {
-    if (!internal) {
-        html = filterHTML(html);
-    }
+var pasteHTML = function (html, internal, extendedMode) {
+    html = filterHTML(html, internal, extendedMode);
     setFormat("inserthtml", html);
 };
 
-var filterHTML = function (html) {
+var filterHTML = function (html, internal, extendedMode) {
     // wrap it in <top> as we aren't allowed to change top level elements
     var top = $.parseHTML("<ankitop>" + html + "</ankitop>")[0];
-    filterNode(top);
+    if (internal) {
+        filterInternalNode(top);
+    }  else {
+        filterNode(top, extendedMode);
+    }
     var outHtml = top.innerHTML;
+    // remove newlines in HTML, as they break cloze deletions, and collapse whitespace
+    outHtml = outHtml.replace(/[\n\t ]+/g, " ").trim();
     //console.log(`input html: ${html}`);
     //console.log(`outpt html: ${outHtml}`);
     return outHtml;
 };
 
-var allowedTags = {};
+var allowedTagsBasic = {};
+var allowedTagsExtended = {};
 
-var TAGS_WITHOUT_ATTRS = ["H1", "H2", "H3", "P", "DIV", "BR", "LI", "UL",
-    "OL", "B", "I", "U", "BLOCKQUOTE", "CODE", "EM",
-    "STRONG", "PRE", "SUB", "SUP", "TABLE", "DD", "DT", "DL"];
-for (var i = 0; i < TAGS_WITHOUT_ATTRS.length; i++) {
-    allowedTags[TAGS_WITHOUT_ATTRS[i]] = {"attrs": []};
+var TAGS_WITHOUT_ATTRS = ["P", "DIV", "BR",
+    "B", "I", "U", "EM", "STRONG", "SUB", "SUP"];
+var i;
+for (i = 0; i < TAGS_WITHOUT_ATTRS.length; i++) {
+    allowedTagsBasic[TAGS_WITHOUT_ATTRS[i]] = {"attrs": []};
 }
 
-allowedTags["A"] = {"attrs": ["HREF"]};
-allowedTags["TR"] = {"attrs": ["ROWSPAN"]};
-allowedTags["TD"] = {"attrs": ["COLSPAN", "ROWSPAN"]};
-allowedTags["TH"] = {"attrs": ["COLSPAN", "ROWSPAN"]};
-allowedTags["IMG"] = {"attrs": ["SRC"]};
-
-var blockRegex = /^(address|blockquote|br|center|div|dl|h[1-6]|hr|ol|p|pre|table|ul|dd|dt|li|tbody|td|tfoot|th|thead|tr)$/i;
-function isBlockLevel(n) {
-    return blockRegex.test(n.nodeName);
+TAGS_WITHOUT_ATTRS = ["H1", "H2", "H3", "LI", "UL", "BLOCKQUOTE", "CODE",
+    "PRE", "TABLE", "DD", "DT", "DL"];
+for (i = 0; i < TAGS_WITHOUT_ATTRS.length; i++) {
+    allowedTagsExtended[TAGS_WITHOUT_ATTRS[i]] = {"attrs": []};
 }
 
-function isInlineElement(n) {
-    return n && !isBlockLevel(n);
-}
+allowedTagsBasic["IMG"] = {"attrs": ["SRC"]};
 
-function convertDivToNewline(node, isParagraph) {
-    var html = node.innerHTML;
-    if (isInlineElement(node.previousSibling) && html) {
-        html = "\n" + html;
+allowedTagsExtended["A"] = {"attrs": ["HREF"]};
+allowedTagsExtended["TR"] = {"attrs": ["ROWSPAN"]};
+allowedTagsExtended["TD"] = {"attrs": ["COLSPAN", "ROWSPAN"]};
+allowedTagsExtended["TH"] = {"attrs": ["COLSPAN", "ROWSPAN"]};
+
+// add basic tags to extended
+Object.assign(allowedTagsExtended, allowedTagsBasic);
+
+// filtering from another field
+var filterInternalNode = function (node) {
+    if (node.tagName === "SPAN") {
+        node.style.removeProperty("background-color");
+        node.style.removeProperty("font-size");
+        node.style.removeProperty("font-family");
     }
-    if (isInlineElement(node.nextSibling)) {
-        html += "\n";
+    // recurse
+    for (var i = 0; i < node.childNodes.length; i++) {
+        filterInternalNode(node.childNodes[i]);
     }
-    if (isParagraph) {
-        html += "\n";
-    }
-    node.outerHTML = html;
-}
+};
 
-var filterNode = function (node) {
+// filtering from external sources
+var filterNode = function (node, extendedMode) {
     // text node?
     if (node.nodeType === 3) {
-        if (prewrapMode) {
-            // collapse standard whitespace
-            var val = node.nodeValue.replace(/^[ \r\n\t]+$/g, " ");
-
-            // non-breaking spaces can be represented as normal spaces
-            val = val.replace(/&nbsp;|\u00a0/g, " ");
-
-            node.nodeValue = val;
-        }
         return;
     }
 
@@ -389,26 +379,25 @@ var filterNode = function (node) {
         nodes.push(node.childNodes[i]);
     }
     for (i = 0; i < nodes.length; i++) {
-        filterNode(nodes[i]);
+        filterNode(nodes[i], extendedMode);
     }
 
     if (node.tagName === "ANKITOP") {
         return;
     }
 
-    var tag = allowedTags[node.tagName];
+    var tag;
+    if (extendedMode) {
+        tag = allowedTagsExtended[node.tagName];
+    } else {
+        tag = allowedTagsBasic[node.tagName];
+    }
     if (!tag) {
         if (!node.innerHTML) {
             node.parentNode.removeChild(node);
         } else {
             node.outerHTML = node.innerHTML;
         }
-    } else if (prewrapMode && node.tagName === "BR") {
-        node.outerHTML = "\n";
-    } else if (prewrapMode && node.tagName === "DIV") {
-        convertBlockToNewline(node, false);
-    } else if (prewrapMode && node.tagName === "P") {
-        convertBlockToNewline(node, true);
     } else {
         // allowed, filter out attributes
         var toRemove = [];

@@ -176,7 +176,6 @@ class Anki2Importer(Importer):
                 # copy it over
                 model = srcModel.copy()
                 model['id'] = mid
-                model['mod'] = intTime()
                 model['usn'] = self.col.usn()
                 self.dst.models.update(model)
                 break
@@ -184,12 +183,12 @@ class Anki2Importer(Importer):
             dstModel = self.dst.models.get(mid)
             dstScm = self.dst.models.scmhash(dstModel)
             if srcScm == dstScm:
-                # they do; we can reuse this mid
-                model = srcModel.copy()
-                model['id'] = mid
-                model['mod'] = intTime()
-                model['usn'] = self.col.usn()
-                self.dst.models.update(model)
+                # copy styling changes over if newer
+                if srcModel['mod'] > dstModel['mod']:
+                    model = srcModel.copy()
+                    model['id'] = mid
+                    model['usn'] = self.col.usn()
+                    self.dst.models.update(model)
                 break
             # as they don't match, try next id
             mid += 1
@@ -341,7 +340,8 @@ insert or ignore into revlog values (?,?,?,?,?,?,?,?,?)""", revlog)
             dir = self.src.media.dir()
         path = os.path.join(dir, fname)
         try:
-            return open(path, "rb").read()
+            with open(path, "rb") as f:
+                return f.read()
         except (IOError, OSError):
             return
 
@@ -357,7 +357,8 @@ insert or ignore into revlog values (?,?,?,?,?,?,?,?,?)""", revlog)
         path = os.path.join(self.dst.media.dir(),
                             unicodedata.normalize("NFC", fname))
         try:
-            open(path, "wb").write(data)
+            with open(path, "wb") as f:
+                f.write(data)
         except (OSError, IOError):
             # the user likely used subdirectories
             pass

@@ -121,16 +121,41 @@ create table meta (dirMod int, lastUsn int); insert into meta values (0, 0);
     def dir(self):
         return self._dir
 
+    def _isFAT32(self):
+        if not isWin:
+            return
+        import win32api, win32file
+        try:
+                name = win32file.GetVolumeNameForVolumeMountPoint(self._dir[:3])
+        except:
+            # mapped & unmapped network drive; pray that it's not vfat
+            return
+        if win32api.GetVolumeInformation(name)[4].lower().startswith("fat"):
+                return True
+
     # Adding media
     ##########################################################################
     # opath must be in unicode
 
     def addFile(self, opath):
-        return self.writeData(opath, open(opath, "rb").read())
+        with open(opath, "rb") as f:
+            return self.writeData(opath, f.read())
 
-    def writeData(self, opath, data):
+    def writeData(self, opath, data, typeHint=None):
         # if fname is a full path, use only the basename
         fname = os.path.basename(opath)
+
+        # if it's missing an extension and a type hint was provided, use that
+        if not os.path.splitext(fname)[1] and typeHint:
+            # mimetypes is returning '.jpe' even after calling .init(), so we'll do
+            # it manually instead
+            typeMap = {
+                "image/jpeg": ".jpg",
+                "image/png": ".png",
+            }
+            if typeHint in typeMap:
+                fname += typeMap[typeHint]
+
         # make sure we write it in NFC form (on mac will autoconvert to NFD),
         # and return an NFC-encoded reference
         fname = unicodedata.normalize("NFC", fname)
@@ -147,11 +172,13 @@ create table meta (dirMod int, lastUsn int); insert into meta values (0, 0);
             path = os.path.join(self.dir(), fname)
             # if it doesn't exist, copy it directly
             if not os.path.exists(path):
-                open(path, "wb").write(data)
+                with open(path, "wb") as f:
+                    f.write(data)
                 return fname
             # if it's identical, reuse
-            if checksum(open(path, "rb").read()) == csum:
-                return fname
+            with open(path, "rb") as f:
+                if checksum(f.read()) == csum:
+                    return fname
             # otherwise, increment the index in the filename
             reg = " \((\d+)\)$"
             if not re.search(reg, root):
@@ -209,17 +236,22 @@ create table meta (dirMod int, lastUsn int); insert into meta values (0, 0);
         from anki.template.template import clozeReg
         def qrepl(m):
             """The text by which the cloze m must be replaced in the question."""
+            if m.group(4):
+                return "[%s]" % m.group(4)
+            else:
+                return "[...]"
+            
             if m.group(3):
                 return "[%s]" % m.group(3)
             else:
                 return "[...]"
         def arepl(m):
             """The text by which the cloze m must be replaced in the answer."""
-            return m.group(1)
+            return m.group(2)
         for ord in ords:
             s = re.sub(clozeReg%ord, qrepl, string)
             #Replace the cloze number ord by the deletion
-            s = re.sub(clozeReg%".+?", "\\2", s)
+            s = re.sub(clozeReg%".+?", "\\4", s)
             #Replace every other clozes by their content
             strings.append(s)
         strings.append(re.sub(clozeReg%".+?", arepl, string))
@@ -364,7 +396,8 @@ create table meta (dirMod int, lastUsn int); insert into meta values (0, 0);
 
     def findChanges(self):
         "Scan the media folder if it's changed, and note any changes."
-        self._logChanges()
+        if self._changed():
+            self._logChanges()
 
     def haveDirty(self):
         return self.db.scalar("select 1 from media where dirty=1 limit 1")
@@ -373,7 +406,17 @@ create table meta (dirMod int, lastUsn int); insert into meta values (0, 0);
         return int(os.stat(path).st_mtime)
 
     def _checksum(self, path):
-        return checksum(open(path, "rb").read())
+        with open(path, "rb") as f:
+            return checksum(f.read())
+
+    def _changed(self):
+        "Return dir mtime if it has changed since the last findChanges()"
+        # doesn't track edits, but user can add or remove a file to update
+        mod = self.db.scalar("select dirMod from meta")
+        mtime = self._mtime(self.dir())
+        if not self._isFAT32() and mod and mod == mtime:
+            return False
+        return mtime
 
     def _logChanges(self):
         (added, removed) = self._changes()
@@ -385,6 +428,7 @@ create table meta (dirMod int, lastUsn int); insert into meta values (0, 0);
         # update media db
         self.db.executemany("insert or replace into media values (?,?,?,?)",
                             media)
+        self.db.execute("update meta set dirMod = ?", self._mtime(self.dir()))
         self.db.commit()
 
     def _changes(self):
@@ -541,7 +585,8 @@ create table meta (dirMod int, lastUsn int); insert into meta values (0, 0);
                 else:
                     name = unicodedata.normalize("NFC", name)
                 # save file
-                open(name, "wb").write(data)
+                with open(name, "wb") as f:
+                    f.write(data)
                 # update db
                 media.append((name, csum, self._mtime(name), 0))
                 cnt += 1

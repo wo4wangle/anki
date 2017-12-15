@@ -2,7 +2,7 @@
 # Copyright: Damien Elmes <anki@ichi2.net>
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
-import re, os, shutil, cgi
+import re, os, shutil, html
 from anki.utils import checksum, call, namedtmp, tmpdir, isMac, stripHTML
 from anki.hooks import addHook
 from anki.lang import _
@@ -190,6 +190,7 @@ package in the LaTeX header instead.""") % bad
         return
     finally:
         os.chdir(oldcwd)
+        log.close()
 
 def _errMsg(type, texpath):
     """An error message, in html, concerning LaTeX compilation.
@@ -204,10 +205,11 @@ def _errMsg(type, texpath):
     msg = (_("Error executing %s.") % type) + "<br>"
     msg += (_("Generated file: %s") % texpath) + "<br>"
     try:
-        log = open(namedtmp("latex_log.txt", rm=False)).read()
+        with open(namedtmp("latex_log.txt", rm=False)) as f:
+            log = f.read()
         if not log:
             raise Exception()
-        msg += "<small><pre>" + cgi.escape(log) + "</pre></small>"
+        msg += "<small><pre>" + html.escape(log) + "</pre></small>"
     except:
         msg += _("Have you installed latex and dvipng/dvisvgm?")
         pass

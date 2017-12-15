@@ -5,6 +5,12 @@ hr {
 
 body {
     margin: 1.5em;
+    overflow-wrap: break-word;
+}
+
+body.nightMode {
+    background-color: black;
+    color: white;
 }
 
 img {
