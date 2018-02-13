@@ -6,10 +6,14 @@
 
 
 A deck is an array composed of:
-newToday -- two number array used somehow for custom study, 
-revToday -- two number array used somehow for custom study, 
-lrnToday -- two number array used somehow for custom study, 
-timeToday -- two number array used somehow for custom study, 
+newToday -- two number array. 
+            First one is currently unused
+            The second one is equal to the negation (* (-1)) of the increase of the number of new cards to see today.
+revToday -- two number array. 
+            First one is currently unused
+            The second one is equal to the negation (* (-1)) of the increase of the number of review cards to see today.
+lrnToday -- two number array used somehow for custom study, Seems to be unused in the current code.
+timeToday -- two number array used somehow for custom study,  seems to be currently unused
 conf -- (string) id of option group from dconf
 usn -- Update sequence number: used in same way as other usn vales in db
 desc -- deck description, it is shown when cards are learned or reviewd

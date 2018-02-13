@@ -48,7 +48,7 @@ when adding new notes" """
 want to require from the 'flds' array"]"""
 
 
-"""tmpls's field are:
+"""tmpls: a dict with
 afmt -- "answer template string",
 bafmt -- "browser answer format: 
 used for displaying answer in browser",
@@ -289,10 +289,10 @@ select id from cards where nid in (select id from notes where mid = ?)""",
     ##################################################
 
     def nids(self, m):
-        "The note ids of M.
+        """The ids of notes whose model is m.
 
         Keyword arguments
-        m -- a model object."
+        m -- a model object."""
         return self.col.db.list(
             "select id from notes where mid = ?", m['id'])
 
@@ -612,8 +612,7 @@ select id from notes where mid = ?)""" % " ".join(map),
         nids -- the list of id of notes to change
         oldModel -- the soruce model of the notes
         newmodel -- the model of destination of the notes
-        map -- the dictionnary sending to each card 'ord of the old model a card'ord of the new model
-
+        map -- the dictionnary sending to each card 'ord of the old model a card'ord of the new model or to None
         """
         d = []
         deleted = []
