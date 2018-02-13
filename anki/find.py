@@ -265,7 +265,7 @@ select distinct(n.id) from cards c, notes n where c.nid=n.id and """+preds
         elif val == "suspended":
             return "c.queue = -1"
         elif val == "buried":
-            return "c.queue = -2"
+            return "c.queue in (-2, -3)"
         elif val == "due":
             return """
 (c.queue in (2,3) and c.due <= %d) or
@@ -440,7 +440,7 @@ select distinct(n.id) from cards c, notes n where c.nid=n.id and """+preds
             # nothing has that field
             return
         # gather nids
-        regex = re.escape(val).replace("\\_", ".").replace("\\%", ".*")
+        regex = re.escape(val).replace("_", ".").replace("\\%", ".*")
         nids = []
         for (id,mid,flds) in self.col.db.execute("""
 select id, mid, flds from notes

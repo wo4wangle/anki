@@ -84,15 +84,15 @@ class Editor:
         righttopbtns.append(self._addButton('text_clear', 'clear', _("Remove formatting (Ctrl+R)")))
         # The color selection buttons do not use an icon so the HTML must be specified manually
         tip = _("Set foreground colour (F7)")
-        righttopbtns.append(f'''<button tabindex=-1 class=linkb title="{tip}"
+        righttopbtns.append('''<button tabindex=-1 class=linkb title="{}"
             type="button" onclick="pycmd('colour');return false;">
             <div id=forecolor style="display:inline-block; background: #000;border-radius: 5px;"
-            class=topbut></div></button>''')
+            class=topbut></div></button>'''.format(tip))
         tip = _("Change colour (F8)")
-        righttopbtns.append(f'''<button tabindex=-1 class=linkb title="{tip}"
+        righttopbtns.append('''<button tabindex=-1 class=linkb title="{}"
             type="button" onclick="pycmd('changeCol');return false;">
             <div style="display:inline-block; border-radius: 5px;"
-            class="topbut rainbow"></div></button>''')
+            class="topbut rainbow"></div></button>'''.format(tip))
         righttopbtns.append(self._addButton('text_cloze', 'cloze', _("Cloze deletion (Ctrl+Shift+C)")))
         righttopbtns.append(self._addButton('paperclip', 'attach', _("Attach pictures/audio/video (F3)")))
         righttopbtns.append(self._addButton('media-record', 'record', _("Record audio (F5)")))
@@ -483,7 +483,7 @@ to a cloze type first, via Edit>Change Note Type."""))
         # find the highest existing cloze
         highest = 0
         for name, val in list(self.note.items()):
-            m = re.findall("\{\{c(\d+)::", val)
+            m = re.findall(r"\{\{c(\d+)::", val)
             if m:
                 highest = max(highest, sorted([int(x) for x in m])[-1])
         # reuse last?
@@ -613,7 +613,7 @@ to a cloze type first, via Edit>Change Note Type."""))
             local = False
         # fetch it into a temporary folder
         self.mw.progress.start(
-            immediate=True, parent=self.parentWindow)
+            immediate=not local, parent=self.parentWindow)
         ct = None
         try:
             if local:
@@ -636,7 +636,7 @@ to a cloze type first, via Edit>Change Note Type."""))
         finally:
             self.mw.progress.finish()
         # strip off any query string
-        url = re.sub("\?.*?$", "", url)
+        url = re.sub(r"\?.*?$", "", url)
         path = urllib.parse.unquote(url)
         return self.mw.col.media.writeData(path, filecontents, typeHint=ct)
 
@@ -669,7 +669,7 @@ to a cloze type first, via Edit>Change Note Type."""))
 
             # in internal pastes, rewrite mediasrv references to relative
             if internal:
-                m = re.match("http://127.0.0.1:\d+/(.*)$", src)
+                m = re.match(r"http://127.0.0.1:\d+/(.*)$", src)
                 if m:
                     tag['src'] = m.group(1)
             else:
@@ -682,9 +682,8 @@ to a cloze type first, via Edit>Change Note Type."""))
         html = str(doc)
         return html
 
-    def doPaste(self, html, internal):
+    def doPaste(self, html, internal, extended=False):
         html = self._pastePreFilter(html, internal)
-        extended = self.mw.app.queryKeyboardModifiers() & Qt.ShiftModifier
         if extended:
             extended = "true"
         else:
@@ -794,11 +793,12 @@ class EditorWebView(AnkiWebView):
         self.triggerPageAction(QWebEnginePage.Copy)
 
     def onPaste(self):
+        extended = self.editor.mw.app.queryKeyboardModifiers() & Qt.ShiftModifier
         mime = self.editor.mw.app.clipboard().mimeData(mode=QClipboard.Clipboard)
         html, internal = self._processMime(mime)
         if not html:
             return
-        self.editor.doPaste(html, internal)
+        self.editor.doPaste(html, internal, extended)
 
     def dropEvent(self, evt):
         mime = evt.mimeData()
@@ -854,6 +854,7 @@ class EditorWebView(AnkiWebView):
 
         # normal text; convert it to HTML
         txt = html.escape(txt)
+        txt = txt.replace("\n", "<br>")
         return txt
 
     def _processHtml(self, mime):

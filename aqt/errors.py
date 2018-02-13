@@ -56,10 +56,8 @@ class ErrorHandler(QObject):
         self.timer.start()
 
     def tempFolderMsg(self):
-        return _("""\
-The permissions on your system's temporary folder are incorrect, and Anki is \
-not able to correct them automatically. Please search for 'temp folder' in the \
-Anki manual for more information.""")
+        return _("""Unable to access Anki media folder. The permissions on \
+your system's temporary folder may be incorrect.""")
 
     def onTimeout(self):
         error = html.escape(self.pool)
@@ -145,8 +143,9 @@ add-ons section</a> of our support site.
         else:
             platname = "Linux"
 
-        return f"""\
-Anki {appVersion} Python {platform.python_version()} Qt {QT_VERSION_STR} PyQt {PYQT_VERSION_STR}
-Platform: {platname}
-Flags: frz={getattr(sys, "frozen", False)} ao={self.mw.addonManager.dirty}
-"""
+        return """\
+Anki {} Python {} Qt {} PyQt {}
+Platform: {}
+Flags: frz={} ao={}        
+""".format(appVersion, platform.python_version(), QT_VERSION_STR, PYQT_VERSION_STR, platname,
+           getattr(sys, "frozen", False), self.mw.addonManager.dirty)

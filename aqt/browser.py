@@ -451,6 +451,19 @@ class Browser(QMainWindow):
         runHook('browser.setupMenus', self)
         self.mw.maybeHideAccelerators(self)
 
+        # context menu
+        self.form.tableView.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.form.tableView.customContextMenuRequested.connect(self.onContextMenu)
+
+    def onContextMenu(self, _point):
+        m = QMenu()
+        for act in self.form.menu_Cards.actions():
+            m.addAction(act)
+        m.addSeparator()
+        for act in self.form.menu_Notes.actions():
+            m.addAction(act)
+        m.exec_(QCursor.pos())
+
     def updateFont(self):
         # we can't choose different line heights efficiently, so we need
         # to pick a line height big enough for any card template
@@ -1360,7 +1373,7 @@ where id in %s""" % ids2str(sf))
             if self._previewState == "answer":
                 func = "_showAnswer"
                 txt = c.a()
-            txt = re.sub("\[\[type:[^]]+\]\]", "", txt)
+            txt = re.sub(r"\[\[type:[^]]+\]\]", "", txt)
 
             bodyclass = bodyClass(self.mw.col, c)
 
@@ -1380,7 +1393,7 @@ where id in %s""" % ids2str(sf))
 
         self._updatePreviewButtons()
         self._previewWeb.eval(
-            f"{func}({json.dumps(txt)},'{bodyclass}');")
+            "{}({},'{}');".format(func, json.dumps(txt), bodyclass))
 
     def _onPreviewShowBothSides(self, toggle):
         self._previewBothSides = toggle
@@ -1747,7 +1760,7 @@ update cards set usn=?, mod=?, did=? where id in """ + scids,
         t += _("Found %(a)s across %(b)s.") % dict(a=part1, b=part2)
         t += "<p><ol>"
         for val, nids in res:
-            t += '''<li><a href=# onclick="pycmd('%s')">%s</a>: %s</a>''' % (
+            t += '''<li><a href=# onclick="pycmd('%s');return false;">%s</a>: %s</a>''' % (
                 "nid:" + ",".join(str(id) for id in nids),
                 ngettext("%d note", "%d notes", len(nids)) % len(nids),
                 html.escape(val))

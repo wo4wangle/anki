@@ -8,6 +8,7 @@ import traceback
 import zipfile
 import json
 import unicodedata
+import shutil
 
 from aqt.qt import *
 import anki.importing as importing
@@ -388,10 +389,20 @@ def replaceWithApkg(mw, file, backup):
 
 def _replaceWithApkg(mw, file, backup):
     mw.progress.start(immediate=True)
-    # overwrite collection
+
     z = zipfile.ZipFile(file)
+
+    # v2 scheduler?
+    colname = "collection.anki21"
     try:
-        z.extract("collection.anki2", mw.pm.profileFolder())
+        z.getinfo(colname)
+    except KeyError:
+        colname = "collection.anki2"
+
+    try:
+        with z.open(colname) as source, \
+                open(mw.pm.collectionPath(), "wb") as target:
+            shutil.copyfileobj(source, target)
     except:
         mw.progress.finish()
         showWarning(_("The provided file is not a valid .apkg file."))

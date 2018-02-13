@@ -82,15 +82,15 @@ def test_export_ankipkg():
 
 @nose.with_setup(setup1)
 def test_export_anki_due():
-    deck = getEmptyCol()
+    deck = getEmptyCol(schedVer=2)
     f = deck.newNote()
     f['Front'] = "foo"
     deck.addNote(f)
     deck.crt -= 86400*10
     deck.sched.reset()
     c = deck.sched.getCard()
-    deck.sched.answerCard(c, 2)
-    deck.sched.answerCard(c, 2)
+    deck.sched.answerCard(c, 3)
+    deck.sched.answerCard(c, 3)
     # should have ivl of 1, due on day 11
     assert c.ivl == 1
     assert c.due == 11

@@ -2,6 +2,7 @@
 # Copyright: Damien Elmes <anki@ichi2.net>
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+import html
 import re, sys, threading, time, subprocess, os, atexit
 import  random
 from anki.hooks import addHook
@@ -14,6 +15,8 @@ _soundReg = "\[sound:(.*?)\]"
 
 def playFromText(text):
     for match in allSounds(text):
+        # filename is html encoded
+        match = html.unescape(match)
         play(match)
 
 def allSounds(text):
@@ -82,7 +85,7 @@ def retryWait(proc):
 # MPV
 ##########################################################################
 
-from anki.mpv import MPV
+from anki.mpv import MPV, MPVBase
 
 mpvPath, mpvEnv = _packagedCmd(["mpv"])
 
@@ -90,6 +93,11 @@ class MpvManager(MPV):
 
     executable = mpvPath[0]
     popenEnv = mpvEnv
+
+    if not isLin:
+        default_argv = MPVBase.default_argv + [
+            "--input-media-keys=no",
+        ]
 
     def __init__(self):
         super().__init__(window_id=None, debug=False)
@@ -127,6 +135,8 @@ def cleanupMPV():
 ##########################################################################
 
 mplayerCmd = ["mplayer", "-really-quiet", "-noautosub"]
+if isWin:
+    mplayerCmd += ["-ao", "win32"]
 
 mplayerQueue = []
 mplayerManager = None

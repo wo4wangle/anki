@@ -50,6 +50,7 @@ class Syncer:
         # if the deck has any pending changes, flush them first and bump mod
         # time
         self.col.save()
+
         # step 1: login & metadata
         runHook("sync", "login")
         meta = self.server.meta()
@@ -388,6 +389,10 @@ from notes where %s""" % d)
     def mergeDecks(self, rchg):
         for r in rchg[0]:
             l = self.col.decks.get(r['id'], False)
+            # work around mod time being stored as string
+            if l and not isinstance(l['mod'], int):
+                l['mod'] = int(l['mod'])
+
             # if missing locally or server is newer, update
             if not l or r['mod'] > l['mod']:
                 self.col.decks.update(r)

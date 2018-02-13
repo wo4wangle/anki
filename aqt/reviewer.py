@@ -119,12 +119,12 @@ class Reviewer:
 
     def revHtml(self):
         extra = self.mw.col.conf.get("reviewExtra", "")
-        return f"""
+        return """
 <div id=_mark>&#x2605;</div>
 <div id=_flag>&#x2691;</div>
 <div id=qa></div>
-{extra}
-"""
+{}
+""".format(extra)
 
     def _initWeb(self):
         self._reps = 0
@@ -568,7 +568,7 @@ time = %(time)d;
     ##########################################################################
 
     # note the shortcuts listed here also need to be defined above
-    def showContextMenu(self):
+    def _contextMenu(self):
         opts = [
             [_("Flag Card"), [
                 [_("Red Flag"), "Ctrl+1", lambda: self.setFlag(1)],
@@ -590,6 +590,10 @@ time = %(time)d;
             [_("Record Own Voice"), "Shift+V", self.onRecordVoice],
             [_("Replay Own Voice"), "V", self.onReplayRecorded],
         ]
+        return opts
+    
+    def showContextMenu(self):
+        opts = self._contextMenu()
         m = QMenu(self.mw)
         self._addMenuItems(m, opts)
 
