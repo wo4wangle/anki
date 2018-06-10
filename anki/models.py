@@ -242,7 +242,7 @@ select id from cards where nid in (select id from notes where mid = ?)""",
             self.setCurrent(list(self.models.values())[0])
 
     def add(self, m):
-        """TODO"""
+        """TODO (Add a new model ?)"""
         self._setID(m)
         self.update(m)
         self.setCurrent(m)
