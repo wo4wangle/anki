@@ -308,6 +308,8 @@ close the profile or restart Anki."""))
     ##########################################################################
 
     def setupSound(self):
+        if isWin:
+            return
         try:
             anki.sound.setupMPV()
         except FileNotFoundError:
@@ -550,7 +552,7 @@ from the profile screen."))
         self.web.stdHtml("""
 <center><div style="height: 100%%">
 <div style="position:relative; vertical-align: middle;">
-%s<br>
+%s<br><br>
 %s</div></div></center>
 <script>$('#resume').focus()</script>
 """ % (i, b))
@@ -701,12 +703,12 @@ title="%s" %s>%s</button>''' % (
 
     def setupKeys(self):
         globalShortcuts = [
-            ("Ctrl+Shift+;", self.onDebug),
+            ("Ctrl+:", self.onDebug),
             ("d", lambda: self.moveToState("deckBrowser")),
             ("s", self.onStudyKey),
             ("a", self.onAddCard),
             ("b", self.onBrowse),
-            ("Shift+s", self.onStats),
+            ("t", self.onStats),
             ("y", self.onSync)
         ]
         self.applyShortcuts(globalShortcuts)
@@ -960,10 +962,25 @@ Difference to correct time: %s.""") % diffText
         addHook("remNotes", self.onRemNotes)
         addHook("odueInvalid", self.onOdueInvalid)
 
+        addHook("mpvWillPlay", self.onMpvWillPlay)
+        addHook("mpvIdleHook", self.onMpvIdle)
+        self._activeWindowOnPlay = None
+
     def onOdueInvalid(self):
         showWarning(_("""\
 Invalid property found on card. Please use Tools>Check Database, \
 and if the problem comes up again, please ask on the support site."""))
+
+    def onMpvWillPlay(self):
+        if not self._activeWindowOnPlay:
+            self._activeWindowOnPlay = self.app.activeWindow()
+
+    def onMpvIdle(self):
+        w = self._activeWindowOnPlay
+        if w and not sip.isdeleted(w) and w.isVisible():
+            w.activateWindow()
+            w.raise_()
+        self._activeWindowOnPlay = None
 
     # Log note deletion
     ##########################################################################
@@ -1046,11 +1063,13 @@ will be lost. Continue?"""))
         layout.addWidget(text)
         box = QDialogButtonBox(QDialogButtonBox.Close)
         layout.addWidget(box)
-        b = QPushButton(_("Delete Unused"))
-        b.setAutoDefault(False)
-        box.addButton(b, QDialogButtonBox.ActionRole)
-        b.clicked.connect(
-            lambda c, u=unused, d=diag: self.deleteUnused(u, d))
+        if unused:
+            b = QPushButton(_("Delete Unused Files"))
+            b.setAutoDefault(False)
+            box.addButton(b, QDialogButtonBox.ActionRole)
+            b.clicked.connect(
+                lambda c, u=unused, d=diag: self.deleteUnused(u, d))
+
         box.rejected.connect(diag.reject)
         diag.setMinimumHeight(400)
         diag.setMinimumWidth(500)

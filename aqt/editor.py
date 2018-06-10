@@ -245,8 +245,12 @@ class Editor:
             return
         # focus lost or key/button pressed?
         if cmd.startswith("blur") or cmd.startswith("key"):
-            (type, ord, txt) = cmd.split(":", 2)
+            (type, ord, nid, txt) = cmd.split(":", 3)
             ord = int(ord)
+            nid = int(nid)
+            if nid != self.note.id:
+                print("ignored late blur")
+                return
             txt = urllib.parse.unquote(txt)
             txt = unicodedata.normalize("NFC", txt)
             txt = self.mungeHTML(txt)
@@ -321,23 +325,24 @@ class Editor:
                 self.web.setFocus()
             runHook("loadNote", self)
 
-        self.web.evalWithCallback("setFields(%s); setFonts(%s); focusField(%s)" % (
+        self.web.evalWithCallback("setFields(%s); setFonts(%s); focusField(%s); setNoteId(%s)" % (
             json.dumps(data),
-            json.dumps(self.fonts()), json.dumps(focusTo)),
+            json.dumps(self.fonts()), json.dumps(focusTo),
+                                  json.dumps(self.note.id)),
                                   oncallback)
 
     def fonts(self):
         return [(f['font'], f['size'], f['rtl'])
                 for f in self.note.model()['flds']]
 
-    def saveNow(self, callback):
+    def saveNow(self, callback, keepFocus=False):
         "Save unsaved edits then call callback()."
         if not self.note:
              # calling code may not expect the callback to fire immediately
             self.mw.progress.timer(10, callback, False)
             return
         self.saveTags()
-        self.web.evalWithCallback("saveNow()", lambda res: callback())
+        self.web.evalWithCallback("saveNow(%d)" % keepFocus, lambda res: callback())
 
     def checkValid(self):
         cols = []
@@ -470,6 +475,9 @@ class Editor:
         self.web.eval("setFormat('removeFormat');")
 
     def onCloze(self):
+        self.saveNow(self._onCloze, keepFocus=True)
+
+    def _onCloze(self):
         # check that the model is set up for cloze deletion
         if not re.search('{{(.*:)*cloze:',self.note.model()['tmpls'][0]['qfmt']):
             if self.addMode:
@@ -555,12 +563,16 @@ to a cloze type first, via Edit>Change Note Type."""))
         # return a local html link
         return self.fnameToLink(fname)
 
+    def _addMediaFromData(self, fname, data):
+        fname = self.mw.col.media.writeData(fname, data)
+        return self.fnameToLink(fname)
+
     def onRecSound(self):
         try:
             file = getAudio(self.widget)
         except Exception as e:
             showWarning(_(
-                "Couldn't record audio. Have you installed lame and sox?") +
+                "Couldn't record audio. Have you installed 'lame'?") +
                         "\n\n" + repr(str(e)))
             return
         if file:
@@ -599,6 +611,27 @@ to a cloze type first, via Edit>Change Note Type."""))
             or s.startswith("https://")
             or s.startswith("ftp://")
             or s.startswith("file://"))
+
+    def inlinedImageToLink(self, txt):
+        prefix = "data:image/"
+        suffix = ";base64,"
+        for ext in ("jpeg", "png", "gif"):
+            fullPrefix = prefix + ext + suffix
+            if txt.startswith(fullPrefix):
+                b64data = txt[len(fullPrefix):]
+                data = base64.b64decode(b64data, validate=True)
+                if ext == "jpeg":
+                    ext = "jpg"
+                return self._addPastedImage(data, "."+ext)
+
+        return ""
+
+    # ext should include dot
+    def _addPastedImage(self, data, ext):
+        # hash and write
+        csum = checksum(data)
+        fname = "{}-{}{}".format("paste", csum, ext)
+        return self._addMediaFromData(fname, data)
 
     def _retrieveURL(self, url):
         "Download file into media folder and return local filename or None."
@@ -792,13 +825,19 @@ class EditorWebView(AnkiWebView):
     def onCopy(self):
         self.triggerPageAction(QWebEnginePage.Copy)
 
-    def onPaste(self):
+    def _onPaste(self, mode):
         extended = self.editor.mw.app.queryKeyboardModifiers() & Qt.ShiftModifier
-        mime = self.editor.mw.app.clipboard().mimeData(mode=QClipboard.Clipboard)
+        mime = self.editor.mw.app.clipboard().mimeData(mode=mode)
         html, internal = self._processMime(mime)
         if not html:
             return
         self.editor.doPaste(html, internal, extended)
+
+    def onPaste(self):
+        self._onPaste(QClipboard.Clipboard)
+
+    def onMiddleClickPaste(self):
+        self._onPaste(QClipboard.Selection)
 
     def dropEvent(self, evt):
         mime = evt.mimeData()
@@ -826,7 +865,7 @@ class EditorWebView(AnkiWebView):
         html, internal = self._processHtml(mime)
         if html:
             return html, internal
-        for fn in (self._processUrls, self._processImage, self._processText):
+        for fn in (self._processImage, self._processUrls, self._processText):
             html = fn(mime)
             if html:
                 return html, False
@@ -846,6 +885,10 @@ class EditorWebView(AnkiWebView):
             return
 
         txt = mime.text()
+
+        # inlined data in base64?
+        if txt.startswith("data:image/"):
+            return self.editor.inlinedImageToLink(txt)
 
         # if the user is pasting an image or sound link, convert it to local
         if self.editor.isURL(txt):
@@ -869,6 +912,8 @@ class EditorWebView(AnkiWebView):
         return html, False
 
     def _processImage(self, mime):
+        if not mime.hasImage():
+            return
         im = QImage(mime.imageData())
         uname = namedtmp("paste")
         if self.editor.mw.pm.profile.get("pastePNG", False):
@@ -883,15 +928,8 @@ class EditorWebView(AnkiWebView):
         if not os.path.exists(path):
             return
 
-        # hash and rename
-        csum = checksum(open(path, "rb").read())
-        newpath = "{}-{}{}".format(uname, csum, ext)
-        if os.path.exists(newpath):
-            os.unlink(newpath)
-        os.rename(path, newpath)
-
-        # add to media and return resulting html link
-        return self.editor._addMedia(newpath)
+        data = open(path, "rb").read()
+        return self.editor._addPastedImage(data, ext)
 
     def flagAnkiText(self):
         # be ready to adjust when clipboard event fires

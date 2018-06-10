@@ -1407,7 +1407,10 @@ where id in %s""" % ids2str(sf))
     ######################################################################
 
     def deleteNotes(self):
-        self.editor.saveNow(self._deleteNotes)
+        focus = self.focusWidget()
+        if focus != self.form.tableView:
+            return
+        self._deleteNotes()
 
     def _deleteNotes(self):
         nids = self.selectedNotes()
@@ -1848,7 +1851,6 @@ update cards set usn=?, mod=?, did=? where id in """ + scids,
 
     def onNote(self):
         self.editor.web.setFocus()
-        self.editor.web.eval("focusField(0);")
 
     def onCardList(self):
         self.form.tableView.setFocus()

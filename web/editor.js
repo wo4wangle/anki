@@ -1,6 +1,7 @@
 var currentField = null;
 var changeTimer = null;
 var dropTarget = null;
+var currentNoteId = null;
 
 String.prototype.format = function () {
     var args = arguments;
@@ -13,9 +14,16 @@ function setFGButton(col) {
     $("#forecolor")[0].style.backgroundColor = col;
 }
 
-function saveNow() {
+function saveNow(keepFocus) {
+    if (!currentField) {
+        return;
+    }
+
     clearChangeTimer();
-    if (currentField) {
+
+    if (keepFocus) {
+        saveField("key");
+    } else {
         currentField.blur();
     }
 }
@@ -119,6 +127,10 @@ function clearChangeTimer() {
 }
 
 function onFocus(elem) {
+    if (currentField === elem) {
+        // anki window refocused; current element unchanged
+        return;
+    }
     currentField = elem;
     pycmd("focus:" + currentFieldOrdinal());
     enableButtons();
@@ -162,6 +174,9 @@ function focusPrevious() {
 }
 
 function onDragOver(elem) {
+    var e = window.event;
+    e.dataTransfer.dropEffect = "copy";
+    e.preventDefault();
     // if we focus the target element immediately, the drag&drop turns into a
     // copy, so note it down for later instead
     dropTarget = elem;
@@ -189,6 +204,10 @@ function caretToEnd() {
 }
 
 function onBlur() {
+    if (document.activeElement === currentField) {
+        // anki window defocused; current field unchanged
+        return;
+    }
     if (currentField) {
         saveField("blur");
         currentField = null;
@@ -203,7 +222,7 @@ function saveField(type) {
         return;
     }
     // type is either 'blur' or 'key'
-    pycmd(type + ":" + currentFieldOrdinal() + ":" + currentField.innerHTML);
+    pycmd(type + ":" + currentFieldOrdinal() + ":" + currentNoteId + ":" + currentField.innerHTML);
     clearChangeTimer();
 }
 
@@ -293,6 +312,10 @@ function setFonts(fonts) {
          .css("font-size", fonts[i][1]);
         n[0].dir = fonts[i][2] ? "rtl" : "ltr";
     }
+}
+
+function setNoteId(id) {
+    currentNoteId = id;
 }
 
 function showDupes() {

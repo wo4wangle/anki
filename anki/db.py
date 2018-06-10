@@ -101,6 +101,7 @@ class DB:
 
     def close(self):
         """Close the underlying database."""
+        self._db.text_factory = None
         self._db.close()
 
     def set_progress_handler(self, *args):

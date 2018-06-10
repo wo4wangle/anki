@@ -179,7 +179,7 @@ AnkiWeb is too busy at the moment. Please try again in a few minutes.""")
                 "Antivirus or firewall software is preventing Anki from connecting to the internet.")
         elif "10054" in err or "Broken pipe" in err:
             return _("Connection timed out. Either your internet connection is experiencing problems, or you have a very large file in your media folder.")
-        elif "Unable to find the server" in err:
+        elif "Unable to find the server" in err or "socket.gaierror" in err:
             return _(
                 "Server not found. Either your connection is down, or antivirus/firewall "
                 "software is blocking Anki from connecting to the internet.")
@@ -234,6 +234,7 @@ enter your details below.""") %
         return (u, p)
 
     def _confirmFullSync(self):
+        self.mw.progress.finish()
         if self.thread.localIsEmpty:
             diag = askUserDialog(
                 _("Local collection has no cards. Download from AnkiWeb?"),
@@ -266,6 +267,7 @@ automatically."""),
             self.thread.fullSyncChoice = "download"
         else:
             self.thread.fullSyncChoice = "cancel"
+        self.mw.progress.start(immediate=True)
 
     def _clockOff(self):
         showWarning(_("""\

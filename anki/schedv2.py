@@ -171,6 +171,7 @@ order by due""" % self._deckLimit(),
         tot = 0
         pcounts = {}
         # for each of the active decks
+        nameMap = self.col.decks.nameMap()
         for did in self.col.decks.active():
             # early alphas were setting the active ids as a str
             did = int(did)
@@ -179,7 +180,7 @@ order by due""" % self._deckLimit(),
             if not lim:
                 continue
             # check the parents
-            parents = self.col.decks.parents(did)
+            parents = self.col.decks.parents(did, nameMap)
             for p in parents:
                 # add if missing
                 if p['id'] not in pcounts:
@@ -214,6 +215,7 @@ order by due""" % self._deckLimit(),
                 return None
             parts = parts[:-1]
             return "::".join(parts)
+        childMap = self.col.decks.childMap()
         for deck in decks:
             # if we've already seen the exact same deck name, remove the
             # invalid duplicate and reload
@@ -239,7 +241,7 @@ order by due""" % self._deckLimit(),
             else:
                 plim = None
             rlim = self._deckRevLimitSingle(deck, parentLimit=plim)
-            rev = self._revForDeck(deck['id'], rlim)
+            rev = self._revForDeck(deck['id'], rlim, childMap)
             # save to list
             data.append([deck['name'], deck['id'], rev, lrn, new])
             # add deck as a parent
@@ -748,8 +750,8 @@ and due <= ? limit ?)""",
                 lim = min(lim, self._deckRevLimitSingle(parent, parentLimit=lim))
             return lim
 
-    def _revForDeck(self, did, lim):
-        dids = [did] + [x[1] for x in self.col.decks.children(did)]
+    def _revForDeck(self, did, lim, childMap):
+        dids = [did] + self.col.decks.childDids(did, childMap)
         lim = min(lim, self.reportLimit)
         return self.col.db.scalar(
             """
@@ -820,7 +822,7 @@ select id from cards where did in %s and queue = 2 and due <= ? limit ?)"""
     def _answerRevCard(self, card, ease):
         delay = 0
         early = card.odid and (card.odue > self.today)
-        type = early and 3 or 2
+        type = early and 3 or 1
 
         if ease == 1:
             delay = self._rescheduleLapse(card)
@@ -894,7 +896,7 @@ select id from cards where did in %s and queue = 2 and due <= ? limit ?)"""
         delay = self._daysLate(card)
         conf = self._revConf(card)
         fct = card.factor / 1000
-        ivl2 = self._constrainedIvl((card.ivl + delay // 4) * 1.2, conf, card.ivl, fuzz)
+        ivl2 = self._constrainedIvl(card.ivl * 1.2, conf, card.ivl, fuzz)
         if ease == 2:
             return ivl2
 

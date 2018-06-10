@@ -140,13 +140,14 @@ where id > ?""", (self.mw.col.sched.dayCutoff-86400)*1000)
             buf += self._topLevelDragRow()
         else:
             buf = ""
+        nameMap = self.mw.col.decks.nameMap()
         for node in nodes:
-            buf += self._deckRow(node, depth, len(nodes))
+            buf += self._deckRow(node, depth, len(nodes), nameMap)
         if depth == 0:
             buf += self._topLevelDragRow()
         return buf
 
-    def _deckRow(self, node, depth, cnt):
+    def _deckRow(self, node, depth, cnt, nameMap):
         """The HTML for a single deck (and its descendant)
 
         Keyword arguments:
@@ -158,6 +159,7 @@ where id > ?""", (self.mw.col.sched.dayCutoff-86400)*1000)
                  its list of children)
         depth -- indentation argument (number of ancestors)
         cnt --  the number of sibling, counting itself
+        nameMap -- dictionnary, associating to a deck id its node
         """
         name, did, due, lrn, new, children = node
         deck = self.mw.col.decks.get(did)
@@ -166,7 +168,7 @@ where id > ?""", (self.mw.col.sched.dayCutoff-86400)*1000)
             if not self.mw.col.db.scalar("select 1 from cards where did = 1"):
                 return ""
         # parent toggled for collapsing
-        for parent in self.mw.col.decks.parents(did):
+        for parent in self.mw.col.decks.parents(did, nameMap):
             if parent['collapsed']:
                 buff = ""
                 return buff

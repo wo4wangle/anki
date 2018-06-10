@@ -35,6 +35,9 @@ class AddonManager:
             if not os.path.exists(os.path.join(path, "__init__.py")):
                 continue
             l.append(d)
+        l.sort()
+        if os.getenv("ANKIREVADDONS", ""):
+            l = reversed(l)
         return l
 
     def managedAddons(self):
@@ -218,7 +221,7 @@ name/directory is dir.
         """The configuration of this addon, obtained as configuration"""
         path = os.path.join(self.addonsFolder(dir), "config.md")
         if os.path.exists(path):
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 return markdown.markdown(f.read())
         else:
             return ""
