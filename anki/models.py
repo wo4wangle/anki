@@ -757,8 +757,8 @@ select id from notes where mid = ?)""" % " ".join(map),
                 continue#Do not consider cloze not related to an existing field
             ord = map[fname][0]
             ords.update([int(m)-1 for m in re.findall(
-                "{{c(\d+)::.+?}}", sflds[ord])])#The number of the cloze of this field, minus one
-        if -1 in ords: #remove cloze 0
+                "(?s){{c(\d+)::.+?}}", sflds[ord])])#The number of the cloze of this field, minus one
+        if -1 in ords:#remove cloze 0
             ords.remove(-1)
         if not ords and allowEmpty:
             # empty clozes use first ord
