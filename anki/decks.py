@@ -32,7 +32,7 @@ mid -- the model of the deck
 
 
 """A configuration of deck is a dictionnary composed of:
-name -- its name
+name -- its name, including the parents, and the "::"
 new -- The configuration for new cards, see below.
 lapse -- The configuration for lapse cards, see below.
 rev -- The configuration for review cards, see below.

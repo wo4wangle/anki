@@ -270,6 +270,7 @@ and no other programs are accessing your profile folders, then try again."""))
         self.ensureBaseExists()
 
     def _defaultBase(self):
+        """The folder containing every file related to anki's configuration. """
         if isWin:
             loc = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
             # the returned value seem to automatically include the app name, but we use Anki2 rather
@@ -287,6 +288,14 @@ and no other programs are accessing your profile folders, then try again."""))
             return os.path.join(dataDir, "Anki2")
 
     def _loadMeta(self):
+        """
+        Copy prefs to prefs21.db if prefs exists only for 2.0
+        Create a new profile and an error message if prefs21.db has a problem.
+        if no preference database exists, create it, and create a global profile in it using current meta.
+        put database of preferences in self.db
+        Put the _global preferences in self.meta 
+        todo: explain call to _setDefaultLang
+        """
         opath = os.path.join(self.base, "prefs.db")
         path = os.path.join(self.base, "prefs21.db")
         if os.path.exists(opath) and not os.path.exists(path):

@@ -155,7 +155,7 @@ where id > ?""", (self.mw.col.sched.dayCutoff-86400)*1000)
                  its id,
                  its number of due cards,
                  number of cards in learning,
-                 its number of new cards
+                 its number of new cards,
                  its list of children)
         depth -- indentation argument (number of ancestors)
         cnt --  the number of sibling, counting itself
