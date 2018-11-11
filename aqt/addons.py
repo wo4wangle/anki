@@ -204,6 +204,7 @@ When loading '%(name)s':
     ######################################################################
 
     _configButtonActions = {}
+    _configUpdatedActions = {}
 
     def addonConfigDefaults(self, dir):
         """The (default) configuration of the addon whose
@@ -233,6 +234,9 @@ name/directory is dir.
     def configAction(self, addon):
         return self._configButtonActions.get(addon)
 
+    def configUpdatedAction(self, addon):
+        return self._configUpdatedActions.get(addon)
+
     # Add-on Config API
     ######################################################################
 
@@ -251,6 +255,10 @@ name/directory is dir.
     def setConfigAction(self, module, fn):
         addon = self.addonFromModule(module)
         self._configButtonActions[addon] = fn
+
+    def setConfigUpdatedAction(self, module, fn):
+        addon = self.addonFromModule(module)
+        self._configUpdatedActions[addon] = fn
 
     def writeConfig(self, module, conf):
         addon = self.addonFromModule(module)
@@ -300,6 +308,7 @@ class AddonsDialog(QDialog):
         f.viewFiles.clicked.connect(self.onViewFiles)
         f.delete_2.clicked.connect(self.onDelete)
         f.config.clicked.connect(self.onConfig)
+        self.form.addonList.currentRowChanged.connect(self._onAddonItemSelected)
         self.redrawAddons()
         self.show()
 
@@ -310,6 +319,13 @@ class AddonsDialog(QDialog):
         self.form.addonList.addItems([r[0] for r in self.addons])
         if self.addons:
             self.form.addonList.setCurrentRow(0)
+
+    def _onAddonItemSelected(self, row_int):
+        try:
+            addon = self.addons[row_int][1]
+        except IndexError:
+            addon = ''
+        self.form.viewPage.setEnabled(bool (re.match(r"^\d+$", addon)))
 
     def annotatedName(self, dir):
         meta = self.mgr.addonMeta(dir)
@@ -325,7 +341,7 @@ class AddonsDialog(QDialog):
     def onlyOneSelected(self):
         dirs = self.selectedAddons()
         if len(dirs) != 1:
-            showInfo("Please select a single add-on first.")
+            showInfo(_("Please select a single add-on first."))
             return
         return dirs[0]
 
@@ -463,12 +479,12 @@ class ConfigEditor(QDialog):
         restore = self.form.buttonBox.button(QDialogButtonBox.RestoreDefaults)
         restore.clicked.connect(self.onRestoreDefaults)
         self.updateHelp()
-        self.updateText()
+        self.updateText(self.conf)
         self.show()
 
     def onRestoreDefaults(self):
-        self.conf = self.mgr.addonConfigDefaults(self.addon)
-        self.updateText()
+        default_conf = self.mgr.addonConfigDefaults(self.addon)
+        self.updateText(default_conf)
 
     def updateHelp(self):
         txt = self.mgr.addonConfigHelp(self.addon)
@@ -477,17 +493,23 @@ class ConfigEditor(QDialog):
         else:
             self.form.scrollArea.setVisible(False)
 
-    def updateText(self):
+    def updateText(self, conf):
         self.form.editor.setPlainText(
-            json.dumps(self.conf,sort_keys=True,indent=4, separators=(',', ': ')))
+            json.dumps(conf,sort_keys=True,indent=4, separators=(',', ': ')))
 
     def accept(self):
         txt = self.form.editor.toPlainText()
         try:
-            self.conf = json.loads(txt)
+            new_conf = json.loads(txt)
         except Exception as e:
             showInfo(_("Invalid configuration: ") + repr(e))
             return
 
-        self.mgr.writeConfig(self.addon, self.conf)
+        if new_conf != self.conf:
+            self.mgr.writeConfig(self.addon, new_conf)
+            # does the add-on define an action to be fired?
+            act = self.mgr.configUpdatedAction(self.addon)
+            if act:
+                act(new_conf)
+
         super().accept()

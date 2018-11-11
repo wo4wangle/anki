@@ -6,15 +6,7 @@ from aqt.qt import *
 import re, os, sys, urllib.request, urllib.parse, urllib.error, subprocess
 import aqt
 from anki.sound import stripSounds
-from anki.utils import isWin, isMac, invalidFilename
-from contextlib import contextmanager
-
-@contextmanager
-def noBundledLibs():
-    oldlpath = os.environ.pop("LD_LIBRARY_PATH", None)
-    yield
-    if oldlpath is not None:
-        os.environ["LD_LIBRARY_PATH"] = oldlpath
+from anki.utils import isWin, isMac, invalidFilename, noBundledLibs
 
 def openHelp(section):
     link = aqt.appHelpSite
@@ -272,7 +264,11 @@ def getFile(parent, title, cb, filter="*.*", dir=None, key=None):
             cb(file)
         ret.append(file)
     d.accepted.connect(accept)
+    if key:
+        restoreState(d, key)
     d.exec_()
+    if key:
+        saveState(d, key)
     return ret and ret[0]
 
 def getSaveFile(parent, title, dir_description, key, ext, fname=None):
@@ -304,7 +300,11 @@ def getSaveFile(parent, title, dir_description, key, ext, fname=None):
 def saveGeom(widget, key):
     """Associate to the key the geometry of the widget"""
     key += "Geom"
-    aqt.mw.pm.profile[key] = widget.saveGeometry()
+    if isMac and widget.windowState() & Qt.WindowFullScreen:
+        geom = None
+    else:
+        geom = widget.saveGeometry()
+    aqt.mw.pm.profile[key] = geom
 
 def restoreGeom(widget, key, offset=None, adjustSize=False):
     """Gets from the collection profil the geometry associated to the widget named key.
