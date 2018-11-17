@@ -6,6 +6,7 @@ import sre_constants
 import html
 import time
 import re
+import unicodedata
 from operator import  itemgetter
 from anki.lang import ngettext
 import json
@@ -207,11 +208,13 @@ class DataModel(QAbstractTableModel):
         tv = self.browser.form.tableView
         if idx:
             tv.selectRow(idx.row())
-            # we save and then restore the horizontal scroll position because
-            # scrollTo() also scrolls horizontally which is confusing
-            h = tv.horizontalScrollBar().value()
-            tv.scrollTo(idx, tv.PositionAtCenter)
-            tv.horizontalScrollBar().setValue(h)
+            # scroll if the selection count has changed
+            if count != len(self.selectedCards):
+                # we save and then restore the horizontal scroll position because
+                # scrollTo() also scrolls horizontally which is confusing
+                h = tv.horizontalScrollBar().value()
+                tv.scrollTo(idx, tv.PositionAtCenter)
+                tv.horizontalScrollBar().setValue(h)
             if count < 500:
                 # discard large selections; they're too slow
                 sm.select(items, QItemSelectionModel.SelectCurrent |
@@ -330,8 +333,8 @@ COLOUR_SUSPENDED = "#FFFFB2"
 COLOUR_MARKED = "#ccc"
 
 flagColours = {
-    1: "#F5B7B1",
-    2: "#BB8FCE",
+    1: "#ffaaaa",
+    2: "#ffb347",
     3: "#82E0AA",
     4: "#85C1E9",
 }
@@ -442,10 +445,9 @@ class Browser(QMainWindow):
         f.actionReschedule.triggered.connect(self.reschedule)
         f.actionToggle_Suspend.triggered.connect(self.onSuspend)
         f.actionRed_Flag.triggered.connect(lambda: self.onSetFlag(1))
-        f.actionPurple_Flag.triggered.connect(lambda: self.onSetFlag(2))
+        f.actionOrange_Flag.triggered.connect(lambda: self.onSetFlag(2))
         f.actionGreen_Flag.triggered.connect(lambda: self.onSetFlag(3))
         f.actionBlue_Flag.triggered.connect(lambda: self.onSetFlag(4))
-        f.actionClear_Flag.triggered.connect(lambda: self.onSetFlag(0))
         # jumps
         f.actionPreviousCard.triggered.connect(self.onPreviousCard)
         f.actionNextCard.triggered.connect(self.onNextCard)
@@ -475,9 +477,13 @@ class Browser(QMainWindow):
         m = QMenu()
         for act in self.form.menu_Cards.actions():
             m.addAction(act)
+            if qtminor >= 10:
+                act.setShortcutVisibleInContextMenu(True)
         m.addSeparator()
         for act in self.form.menu_Notes.actions():
             m.addAction(act)
+            if qtminor >= 10:
+                act.setShortcutVisibleInContextMenu(True)
         runHook("browser.onContextMenu", self, m)
         m.exec_(QCursor.pos())
 
@@ -573,8 +579,11 @@ class Browser(QMainWindow):
         if self.form.searchEdit.lineEdit().text() == self._searchPrompt:
             self.form.searchEdit.lineEdit().setText("deck:current ")
 
+        # grab search text and normalize
+        txt = self.form.searchEdit.lineEdit().text()
+        txt = unicodedata.normalize("NFC", txt)
+
         # update history
-        txt = str(self.form.searchEdit.lineEdit().text())
         sh = self.mw.pm.profile['searchHistory']
         if txt in sh:
             sh.remove(txt)
@@ -629,6 +638,7 @@ class Browser(QMainWindow):
         self.form.tableView.selectionModel()
         self.form.tableView.setItemDelegate(StatusDelegate(self, self.model))
         self.form.tableView.selectionModel().selectionChanged.connect(self.onRowChanged)
+        self.form.tableView.setStyleSheet("QTableView{ selection-background-color: rgba(127, 127, 127, 50);  }")
         self.singleCard = False
 
     def setupEditor(self):
@@ -655,6 +665,7 @@ class Browser(QMainWindow):
             self.focusTo = None
             self.editor.card = self.card
             self.singleCard = True
+        self._updateFlagsMenu()
         runHook("browser.rowChanged", self)
         self._renderPreview(True)
 
@@ -987,7 +998,7 @@ by clicking on one on the left."""))
             (_("Buried"), "is:buried"),
             None,
             (_("Red Flag"), "flag:1"),
-            (_("Purple Flag"), "flag:2"),
+            (_("Orange Flag"), "flag:2"),
             (_("Green Flag"), "flag:3"),
             (_("Blue Flag"), "flag:4"),
             (_("No Flag"), "flag:0"),
@@ -1565,8 +1576,26 @@ update cards set usn=?, mod=?, did=? where id in """ + scids,
     ######################################################################
 
     def onSetFlag(self, n):
+        # flag needs toggling off?
+        if n == self.card.userFlag():
+            n = 0
         self.col.setUserFlag(n, self.selectedCards())
         self.model.reset()
+
+    def _updateFlagsMenu(self):
+        flag = self.card and self.card.userFlag()
+        flag = flag or 0
+
+        f = self.form
+        flagActions = [f.actionRed_Flag,
+                       f.actionOrange_Flag,
+                       f.actionGreen_Flag,
+                       f.actionBlue_Flag]
+
+        for c, act in enumerate(flagActions):
+            act.setChecked(flag == c+1)
+            if qtminor >= 10:
+                act.setShortcutVisibleInContextMenu(True)
 
     def onMark(self, mark=None):
         if mark is None:
