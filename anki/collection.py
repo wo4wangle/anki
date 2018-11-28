@@ -416,7 +416,10 @@ crt=?, mod=?, scm=?, dty=?, usn=?, ls=?, conf=?""",
         return ok
 
     def genCards(self, nids):
-        "Generate cards for non-empty templates, return ids to remove."
+        """Ids of cards needed to be removed.
+
+        Generate missing cards of a note with id in nids.
+        """
         # build map of (nid,ord) so we don't create dupes
         snids = ids2str(nids)
         have = {}

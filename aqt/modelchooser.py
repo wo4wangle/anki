@@ -57,6 +57,8 @@ class ModelChooser(QHBoxLayout):
         aqt.models.Models(self.mw, self.widget)
 
     def onModelChange(self):
+        """Open Choose Note Type window"""
+        #Method called when we want to change the current model
         from aqt.studydeck import StudyDeck
         current = self.deck.models.current()['name']
         # edit button

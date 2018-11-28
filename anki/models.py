@@ -143,12 +143,14 @@ class ModelManager:
         self.models = json.loads(json_)
 
     def save(self, m=None, templates=False):
-        """Mark m modified if provided, and schedule registry flush.
+        """
+        * Mark m modified if provided. 
+        * Schedule registry flush.
+        * Calls hook newModel
 
-        Calls hook newModel
         Keyword arguments:
         m -- A Model
-        templates -- whether to synchronize templates
+        templates -- whether to check for cards not generated in this model
         """
         if m and m['id']:
             m['mod'] = intTime()
@@ -543,6 +545,7 @@ select id from notes where mid = ?)""" % " ".join(map),
                              self.col.usn(), intTime(), m['id'])
 
     def _syncTemplates(self, m):
+        """Generate all cards not yet generated from, whose note's model is m"""
         rem = self.col.genCards(self.nids(m))
 
     # Model changing

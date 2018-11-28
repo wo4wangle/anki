@@ -33,6 +33,15 @@ class Note:
     newlyAdded -- used by flush, to see whether a note is new or not.
     """
     def __init__(self, col, model=None, id=None):
+        """A note.
+
+        Exactly one of model and id should be set. Not both.
+
+        keyword arguments:
+        id -- a note id. In this case, current note is the note with this id
+        model -- A model object. In which case the note the note use this model.
+
+        """
         assert not (model and id)
         self.col = col
         if id:

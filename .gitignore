@@ -7,3 +7,5 @@
 aqt/forms
 locale
 tools/runanki.system
+/anki/ankiweb.certs
+/tests/test_sched.py

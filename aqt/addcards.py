@@ -78,6 +78,7 @@ class AddCards(QDialog):
         self.historyButton = b
 
     def setAndFocusNote(self, note):
+        """Add note as the content of the editor. Focus in the first element."""
         self.editor.setNote(note, focusTo=0)
 
     def onModelChange(self):
@@ -105,6 +106,15 @@ class AddCards(QDialog):
         self.editor.setNote(note)
 
     def onReset(self, model=None, keep=False):
+        """Create a new note and set it.
+
+        keyword arguments
+        model -- not used
+        keep -- Whether the old note was kept. In this case, remove non sticy fields. Otherwise remove this temporary note.
+        """
+        #Called with keep set to True from  _addCards
+        #Called with default keep __init__, from hook "reset"
+        #Meaning of the word keep guessed. Not clear. 
         oldNote = self.editor.note
         note = self.mw.col.newNote()
         flds = note.model()['flds']
@@ -179,9 +189,14 @@ question on all cards."""), help="AddItems")
         return note
 
     def addCards(self):
+        """Adding the content of the fields as a new note"""
+        #Save edits in the fields, and call _addCards
         self.editor.saveNow(self._addCards)
 
     def _addCards(self):
+        """Adding the content of the fields as a new note.
+
+        Assume that the content of the GUI saved in the model."""
         self.editor.saveAddModeVars()
         note = self.editor.note
         note = self.addNote(note)
@@ -202,9 +217,15 @@ question on all cards."""), help="AddItems")
         return QDialog.keyPressEvent(self, evt)
 
     def reject(self):
+        """Close the window. 
+
+        If data would be lost, ask for confirmation"""
         self.ifCanClose(self._reject)
 
     def _reject(self):
+        """Close the window.
+
+        Don't check whether data will be lost"""
         remHook('reset', self.onReset)
         remHook('currentModelChanged', self.onModelChange)
         clearAudioQueue()

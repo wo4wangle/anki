@@ -46,6 +46,9 @@ html { background: %s; }
 # caller is responsible for resetting note on reset
 class Editor:
     def __init__(self, mw, widget, parentWindow, addMode=False):
+        """TODO
+
+        addMode -- Whether editor is called from addcard.py"""
         self.mw = mw
         self.widget = widget
         self.parentWindow = parentWindow
@@ -295,7 +298,13 @@ class Editor:
     ######################################################################
 
     def setNote(self, note, hide=True, focusTo=None):
-        "Make NOTE the current note."
+        """Make NOTE the current note.
+        
+        keyword arguments:
+        note -- the new note in the editor
+        hide -- whether to hide the current widget
+        focusTo -- in which field should the focus appear
+        """
         self.note = note
         self.currentField = None
         if self.note:
@@ -309,6 +318,9 @@ class Editor:
         self.loadNote(self.currentField)
 
     def loadNote(self, focusTo=None):
+        """Todo 
+
+        keyword -- the index of the field in which the focus should start"""
         if not self.note:
             return
 
@@ -444,6 +456,7 @@ class Editor:
         runHook("tagsUpdated", self.note)
 
     def saveAddModeVars(self):
+        """During creation of new notes, save tags to the note's model"""
         if self.addMode:
             # save tags to model
             m = self.note.model()
@@ -994,9 +1007,9 @@ class EditorWebView(AnkiWebView):
         runHook("EditorWebView.contextMenuEvent", self, m)
         m.popup(QCursor.pos())
 
-# QFont returns "Kozuka Gothic Pro L" but WebEngine expects "Kozuka Gothic Pro"
+# QFont returns "Kozuka Gothic Pro L" but WebEngine expects "Kozuka Gothic Pro Light"
 # - there may be other cases like a trailing 'Bold' that need fixing, but will
 # wait for further reports first.
 def fontMungeHack(font):
-    return re.sub(" L$", "", font)
+    return re.sub(" L$", " Light", font)
 addHook("mungeEditingFontName", fontMungeHack)

@@ -11,11 +11,18 @@ from anki import Collection
 
 class Exporter:
     def __init__(self, col, did=None):
+        #Currently, did is never set during initialisation.
         self.col = col
         self.did = did
 
     def exportInto(self, path):
-        self._escapeCount = 0
+        """Export into path. 
+
+        This is the method called from the GUI to actually export things.
+
+        Keyword arguments:
+        path -- a path of file in which to export"""
+        self._escapeCount = 0# not used ANYWHERE in the code as of 25 november 2018
         file = open(path, "wb")
         self.doExport(file)
         file.close()
@@ -32,6 +39,7 @@ class Exporter:
         return text
 
     def cardIds(self):
+        """card ids of cards in deck self.did if it is set, all ids otherwise."""
         if not self.did:
             cids = self.col.db.list("select id from cards")
         else:
@@ -362,6 +370,7 @@ class AnkiCollectionPackageExporter(AnkiPackageExporter):
 ##########################################################################
 
 def exporters():
+    """A list of pairs (description of an exporter class, the class)"""
     def id(obj):
         return ("%s (*%s)" % (obj.key, obj.ext), obj)
     exps = [
