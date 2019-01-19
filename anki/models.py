@@ -48,7 +48,7 @@ when adding new notes" """
 want to require from the 'flds' array"]"""
 
 
-"""tmpls: a dict with
+"""tmpls (a template): a dict with
 afmt -- "answer template string",
 bafmt -- "browser answer format: 
 used for displaying answer in browser",
