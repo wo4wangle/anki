@@ -551,7 +551,8 @@ class ConfigEditor(QDialog):
 
     def updateText(self, conf):
         self.form.editor.setPlainText(
-            json.dumps(conf,sort_keys=True,indent=4, separators=(',', ': ')))
+            json.dumps(conf, ensure_ascii=False, sort_keys=True,
+                       indent=4, separators=(',', ': ')))
 
     def accept(self):
         txt = self.form.editor.toPlainText()

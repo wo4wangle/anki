@@ -365,7 +365,7 @@ create table if not exists profiles
         if self.firstRun:
             self.create(_("User 1"))
             p = os.path.join(self.base, "README.txt")
-            open(p, "w").write(_("""\
+            open(p, "w", encoding="utf8").write(_("""\
 This folder stores all of your Anki data in a single location,
 to make backups easy. To tell Anki to use a different location,
 please see:
@@ -447,7 +447,10 @@ please see:
 
         path = self._glPath()
         if not os.path.exists(path):
-            return "software"
+            if qtminor >= 12:
+                return "auto"
+            else:
+                return "software"
 
         mode = open(path, "r").read().strip()
 

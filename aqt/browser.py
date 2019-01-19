@@ -18,7 +18,7 @@ from anki.utils import fmtTimeSpan, ids2str, stripHTMLMedia, htmlToTextLine, \
     isWin, intTime, \
     isMac, isLin, bodyClass
 from aqt.utils import saveGeom, restoreGeom, saveSplitter, restoreSplitter, \
-    saveHeader, restoreHeader, saveState, restoreState, applyStyles, getTag, \
+    saveHeader, restoreHeader, saveState, restoreState, getTag, \
     showInfo, askUser, tooltip, openHelp, showWarning, shortcut, mungeQA, \
     getOnlyText, MenuList, SubMenu
 from anki.hooks import runHook, addHook, remHook, runFilter
@@ -385,7 +385,6 @@ class Browser(QMainWindow):
 
     def __init__(self, mw):
         QMainWindow.__init__(self, None, Qt.Window)
-        applyStyles(self)
         self.mw = mw
         self.col = self.mw.col
         self.lastFilter = ""
@@ -672,6 +671,9 @@ class Browser(QMainWindow):
     def refreshCurrentCard(self, note):
         self.model.refreshNote(note)
         self._renderPreview(False)
+
+    def onLoadNote(self, editor):
+        self.refreshCurrentCard(editor.note)
 
     def refreshCurrentCardFilter(self, flag, note, fidx):
         self.refreshCurrentCard(note)
@@ -1699,6 +1701,7 @@ update cards set usn=?, mod=?, did=? where id in """ + scids,
         addHook("undoState", self.onUndoState)
         addHook("reset", self.onReset)
         addHook("editTimer", self.refreshCurrentCard)
+        addHook("loadNote", self.onLoadNote)
         addHook("editFocusLost", self.refreshCurrentCardFilter)
         for t in "newTag", "newModel", "newDeck":
             addHook(t, self.maybeRefreshSidebar)
@@ -1706,6 +1709,7 @@ update cards set usn=?, mod=?, did=? where id in """ + scids,
     def teardownHooks(self):
         remHook("reset", self.onReset)
         remHook("editTimer", self.refreshCurrentCard)
+        remHook("loadNote", self.onLoadNote)
         remHook("editFocusLost", self.refreshCurrentCardFilter)
         remHook("undoState", self.onUndoState)
         for t in "newTag", "newModel", "newDeck":
@@ -1727,7 +1731,7 @@ update cards set usn=?, mod=?, did=? where id in """ + scids,
         if not sf:
             return
         import anki.find
-        fields = sorted(anki.find.fieldNames(self.col, downcase=False))
+        fields = anki.find.fieldNamesForNotes(self.mw.col, sf)
         d = QDialog(self)
         frm = aqt.forms.findreplace.Ui_Dialog()
         frm.setupUi(d)
@@ -1784,7 +1788,8 @@ update cards set usn=?, mod=?, did=? where id in """ + scids,
         frm = aqt.forms.finddupes.Ui_Dialog()
         frm.setupUi(d)
         restoreGeom(d, "findDupes")
-        fields = sorted(anki.find.fieldNames(self.col, downcase=False))
+        fields = sorted(anki.find.fieldNames(self.col, downcase=False),
+                        key=lambda x: x.lower())
         frm.fields.addItems(fields)
         self._dupesButton = None
         # links
@@ -2098,7 +2103,6 @@ Any cards mapped to nothing will be deleted. \
 If a note has no remaining cards, it will be lost. \
 Are you sure you want to continue?""")):
                 return
-        QDialog.accept(self)
         self.browser.mw.checkpoint(_("Change Note Type"))
         b = self.browser
         b.mw.col.modSchema(check=True)
@@ -2111,6 +2115,7 @@ Are you sure you want to continue?""")):
         b.mw.progress.finish()
         b.mw.reset()
         self.cleanup()
+        QDialog.accept(self)
 
     def onHelp(self):
         openHelp("browsermisc")
