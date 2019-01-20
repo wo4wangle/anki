@@ -709,15 +709,21 @@ select id from notes where mid = ?)""" % " ".join(map),
         m['req'] = req
 
     def _reqForTemplate(self, m, flds, t):
+        """A rule which is suppode to determine whether a card should be
+        generated or not according to its fields. See ../documentation/templates_generation_rules.md
+        """
         a = []
         b = []
         for f in flds:
             a.append("ankiflag")
             b.append("")
         data = [1, 1, m['id'], 1, t['ord'], "", joinFields(a)]
+        # The html of the card at position ord where each field's content is "ankiflag"
         full = self.col._renderQA(data)['q']
         data = [1, 1, m['id'], 1, t['ord'], "", joinFields(b)]
+        # The html of the card at position ord where each field's content is the empty string ""
         empty = self.col._renderQA(data)['q']
+        
         # if full and empty are the same, the template is invalid and there is
         # no way to satisfy it
         if full == empty:
@@ -746,7 +752,8 @@ select id from notes where mid = ?)""" % " ".join(map),
         return type, req
 
     def availOrds(self, m, flds):
-        "Given a joined field string, return available template ordinals."
+        "Given a joined field string, return available template ordinals. See
+        ../documentation/templates_generation_rules.md for the detail"
         if m['type'] == MODEL_CLOZE:
             return self._availClozeOrds(m, flds)
         fields = {}
@@ -780,6 +787,7 @@ select id from notes where mid = ?)""" % " ".join(map),
         return avail
 
     def _availClozeOrds(self, m, flds, allowEmpty=True):
+
         """The list of numbers of cloze field.
 
         keyword arguments:

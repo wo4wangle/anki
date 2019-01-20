@@ -667,7 +667,8 @@ where c.nid = n.id and c.id in %s group by nid""" % ids2str(cids)):
         TODO comment better
 
         """
-        flist = splitFields(data[6])#the list of fields
+        cid, nid, mid, did, ord, tags, flds = data
+        flist = splitFields(flds)#the list of fields
         fields = {} #
         #name -> ord for each field, tags
         # Type: the name of the model,
@@ -675,46 +676,46 @@ where c.nid = n.id and c.id in %s group by nid""" % ids2str(cids)):
         # Card: the template name
         # cn: 1 for n being the ord+1
         # FrontSide : 
-        model = self.models.get(data[2])
+        model = self.models.get(nid)
         for (name, (idx, conf)) in list(self.models.fieldMap(model).items()):#conf is not used
             fields[name] = flist[idx]
-        fields['Tags'] = data[5].strip()
+        fields['Tags'] = tags.strip()
         fields['Type'] = model['name']
-        fields['Deck'] = self.decks.name(data[3])
+        fields['Deck'] = self.decks.name(did)
         fields['Subdeck'] = fields['Deck'].split('::')[-1]
-        if model['type'] == MODEL_STD:#model['type'] is distinct from fields['Type']
-            template = model['tmpls'][data[4]]
+        if model['type'] == MODEL_STD:#Note that model['type'] has not the same meaning as fields['Type']
+            template = model['tmpls'][ord]
         else:#for cloze deletions
             template = model['tmpls'][0]
         fields['Card'] = template['name']
-        fields['c%d' % (data[4]+1)] = "1"
+        fields['c%d' % (ord+1)] = "1"
         # render q & a
-        d = dict(id=data[0])
+        d = dict(id=cid)
         # id: card id
         qfmt = qfmt or template['qfmt']
         afmt = afmt or template['afmt']
         for (type, format) in (("q", qfmt), ("a", afmt)):
-            if type == "q":#if/else is in the loop in order for d['q'] to be defined below
-                format = re.sub("{{(?!type:)(.*?)cloze:", r"{{\1cq-%d:" % (data[4]+1), format)
+            if type == "q":
+                format = re.sub("{{(?!type:)(.*?)cloze:", r"{{\1cq-%d:" % (ord+1), format)
                 #Replace {{'foo'cloze: by {{'foo'cq-(ord+1), where 'foo' does not begins with "type:"
                 format = format.replace("<%cloze:", "<%%cq:%d:" % (
-                    data[4]+1))
+                    ord+1))
                 #Replace <%cloze: by <%%cq:(ord+1)
             else:
-                format = re.sub("{{(.*?)cloze:", r"{{\1ca-%d:" % (data[4]+1), format)
+                format = re.sub("{{(.*?)cloze:", r"{{\1ca-%d:" % (ord+1), format)
                 #Replace {{'foo'cloze: by {{'foo'ca-(ord+1)
                 format = format.replace("<%cloze:", "<%%ca:%d:" % (
-                    data[4]+1))
+                    ord+1))
                 #Replace <%cloze: by <%%ca:(ord+1)
                 fields['FrontSide'] = stripSounds(d['q'])
-                #d['q'] defined during loop's first iteration
-            fields = runFilter("mungeFields", fields, model, data, self)
-            html = anki.template.render(format, fields) #probably replace everything of the form {{ by its value
+                #d['q'] is defined during loop's first iteration
+            fields = runFilter("mungeFields", fields, model, data, self) # TODO check
+            html = anki.template.render(format, fields) #probably replace everything of the form {{ by its value TODO check
             d[type] = runFilter(
-                "mungeQA", html, type, fields, model, data, self)
+                "mungeQA", html, type, fields, model, data, self) # TODO check
             # empty cloze?
             if type == 'q' and model['type'] == MODEL_CLOZE:
-                if not self.models._availClozeOrds(model, data[6], False):
+                if not self.models._availClozeOrds(model, flds, False):
                     d['q'] += ("<p>" + _(
                 "Please edit this note and add some cloze deletions. (%s)") % (
                 "<a href=%s#cloze>%s</a>" % (HELP_SITE, _("help"))))
