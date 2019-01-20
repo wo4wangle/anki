@@ -8,7 +8,7 @@
 #                  its id,
 #                  its number of due cards,
 #                  number of reviews of cards in learning which will occur today,
-#                  its number of new cards,
+#                  its number of new cards to see today,
 #                  its list of children)
 from aqt.qt import *
 from aqt.utils import askUser, getOnlyText, openLink, showWarning, shortcut, \

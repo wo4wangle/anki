@@ -244,7 +244,7 @@ select id from cards where nid in (select id from notes where mid = ?)""",
             self.setCurrent(list(self.models.values())[0])
 
     def add(self, m):
-        """TODO (Add a new model ?)"""
+        """Add a new model m in the database of models"""
         self._setID(m)
         self.update(m)
         self.setCurrent(m)
@@ -320,7 +320,7 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
     ##################################################
 
     def copy(self, m):
-        "Copy, save and return."
+        "A copy of m, already in the collection."
         m2 = copy.deepcopy(m)
         m2['name'] = _("%s copy") % m2['name']
         self.add(m2)
@@ -386,7 +386,14 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
         self._transformFields(m, add)
 
     def remField(self, m, field):
-        """TODO"""
+        """Remove a field from a model. 
+        Also remove it from each note of this model
+        Move the position of the sortfield. Update the position of each field.
+
+        Modify the template
+
+        m -- the model
+        field -- the field object"""
         self.col.modSchema(check=True)
         # save old sort field
         sortFldName = m['flds'][m['sortf']]['name']
@@ -410,7 +417,11 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
         self.renameField(m, field, None)
 
     def moveField(self, m, field, idx):
-        """TODO"""
+        """Move the field to position idx 
+
+        idx -- new position, integer
+        field -- a field object
+        """
         self.col.modSchema(check=True)
         oldidx = m['flds'].index(field)
         if oldidx == idx:
@@ -432,8 +443,14 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
         self._transformFields(m, move)
 
     def renameField(self, m, field, newName):
-        """TODO"""
+        """Rename the field. In each template, find the mustache related to
+        this field and change them.
+
+        newName -- either a name. Or None if the field is deleted.
+
+        """
         self.col.modSchema(check=True)
+        #Regexp associating to a mustache the name of its field
         pat = r'{{([^{}]*)([:#^/]|[^:#/^}][^:}]*?:|)%s}}'
         def wrap(txt):
             def repl(match):
@@ -461,7 +478,10 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
             f['ord'] = c
 
     def _transformFields(self, m, fn):
-        """TODO"""
+        """For each note of the model m, apply m to the set of field's value,
+        and save the note modified.
+
+        fn -- a function taking and returning a list of field."""
         # model hasn't been added yet?
         if not m['id']:
             return
@@ -478,13 +498,21 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
 
     def newTemplate(self, name):
         """A new template, whose content is the one of
-        defaultTemplate, and name is name."""
+        defaultTemplate, and name is name.
+
+        It's used in order to import mnemosyn, and create the standard
+        model during anki's first initialization. It's not used in day to day anki.
+        """
         t = defaultTemplate.copy()
         t['name'] = name
         return t
 
     def addTemplate(self, m, template):
-        "Note: should col.genCards() afterwards."
+        """Add a new template in m, as last element. This template is a copy
+        of the input template
+        """
+
+        "Note: should call col.genCards() afterwards."
         if m['id']:
             self.col.modSchema(check=True)
         m['tmpls'].append(template)
@@ -492,7 +520,11 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
         self.save(m)
 
     def remTemplate(self, m, template):
-        "False if removing template would leave orphan notes."
+        "Remove the input template from the model m. 
+
+        Return False if removing template would leave orphan
+        notes. Otherwise True
+        "
         assert len(m['tmpls']) > 1
         # find cards using this template
         ord = m['tmpls'].index(template)
@@ -522,10 +554,17 @@ update cards set ord = ord - 1, usn = ?, mod = ?
         return True
 
     def _updateTemplOrds(self, m):
+        """Change the value of 'ord' in each template of this model to reflect its new position""" 
         for c, t in enumerate(m['tmpls']):
             t['ord'] = c
 
     def moveTemplate(self, m, template, idx):
+        """Move input template to position idx in m.
+        
+        Move also every other template to make this consistent.
+
+        Comment again after that TODODODO
+        """
         oldidx = m['tmpls'].index(template)
         if oldidx == idx:
             return
