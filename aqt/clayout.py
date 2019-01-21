@@ -2,7 +2,9 @@
 # Copyright: Damien Elmes <anki@ichi2.net>
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
-"""The window used to preview the different cards of a note."""
+"""The window used to:
+* edit a note type
+* preview the different cards of a note."""
 import collections
 import re
 

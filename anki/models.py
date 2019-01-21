@@ -21,7 +21,7 @@ tags -- Anki saves the tags of the last added note to the current
 model, use an empty array [],
 tmpls -- The list of templates. See below
       -- In db:JSONArray containing object of CardTemplate for each card in
-model. 
+model.
 type -- Integer specifying what type of model. 0 for standard, 1 for
 cloze,
 usn -- Update sequence number: used in same way as other usn vales in
@@ -38,7 +38,7 @@ name -- "field name",
 ord -- "ordinal of the field - goes from 0 to num fields -1",
 rtl -- "boolean, right-to-left script",
 size -- "font size",
-sticky -- "sticky fields retain the value that was last added 
+sticky -- "sticky fields retain the value that was last added
 when adding new notes" """
 
 """req' fields are:
@@ -50,9 +50,9 @@ want to require from the 'flds' array"]"""
 
 """tmpls (a template): a dict with
 afmt -- "answer template string",
-bafmt -- "browser answer format: 
+bafmt -- "browser answer format:
 used for displaying answer in browser",
-bqfmt -- "browser question format: 
+bqfmt -- "browser question format:
 used for displaying question in browser",
 did -- "deck override (null by default)",
 name -- "template name",
@@ -144,7 +144,7 @@ class ModelManager:
 
     def save(self, m=None, templates=False):
         """
-        * Mark m modified if provided. 
+        * Mark m modified if provided.
         * Schedule registry flush.
         * Calls hook newModel
 
@@ -337,7 +337,7 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
 
     def fieldMap(self, m):
         "Mapping of (field name) -> (ord, field object).
-        
+
         keyword arguments:
         m : a model
         "
@@ -386,7 +386,7 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
         self._transformFields(m, add)
 
     def remField(self, m, field):
-        """Remove a field from a model. 
+        """Remove a field from a model.
         Also remove it from each note of this model
         Move the position of the sortfield. Update the position of each field.
 
@@ -417,7 +417,7 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
         self.renameField(m, field, None)
 
     def moveField(self, m, field, idx):
-        """Move the field to position idx 
+        """Move the field to position idx
 
         idx -- new position, integer
         field -- a field object
@@ -520,7 +520,7 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
         self.save(m)
 
     def remTemplate(self, m, template):
-        "Remove the input template from the model m. 
+        "Remove the input template from the model m.
 
         Return False if removing template would leave orphan
         notes. Otherwise True
@@ -554,13 +554,13 @@ update cards set ord = ord - 1, usn = ?, mod = ?
         return True
 
     def _updateTemplOrds(self, m):
-        """Change the value of 'ord' in each template of this model to reflect its new position""" 
+        """Change the value of 'ord' in each template of this model to reflect its new position"""
         for c, t in enumerate(m['tmpls']):
             t['ord'] = c
 
     def moveTemplate(self, m, template, idx):
         """Move input template to position idx in m.
-        
+
         Move also every other template to make this consistent.
 
         Comment again after that TODODODO
@@ -617,7 +617,7 @@ select id from notes where mid = ?)""" % " ".join(map),
         fields according to map. Write the change in the database
 
         Note that if a field is mapped to nothing, it is lost
-        
+
         keyword arguments:
         nids -- the list of id of notes to change
         newmodel -- the model of destination of the note
@@ -644,7 +644,7 @@ select id from notes where mid = ?)""" % " ".join(map),
     def _changeCards(self, nids, oldModel, newModel, map):
         """Change the note whose ids are nid to the model newModel, reorder
         fields according to map. Write the change in the database
-        
+
         Remove the cards mapped to nothing
 
         If the source is a cloze, it is (currently?) mapped to the
@@ -709,7 +709,7 @@ select id from notes where mid = ?)""" % " ".join(map),
         m['req'] = req
 
     def _reqForTemplate(self, m, flds, t):
-        """A rule which is suppode to determine whether a card should be
+        """A rule which is supposed to determine whether a card should be
         generated or not according to its fields. See ../documentation/templates_generation_rules.md
         """
         a = []
@@ -723,7 +723,7 @@ select id from notes where mid = ?)""" % " ".join(map),
         data = [1, 1, m['id'], 1, t['ord'], "", joinFields(b)]
         # The html of the card at position ord where each field's content is the empty string ""
         empty = self.col._renderQA(data)['q']
-        
+
         # if full and empty are the same, the template is invalid and there is
         # no way to satisfy it
         if full == empty:
@@ -788,7 +788,7 @@ select id from notes where mid = ?)""" % " ".join(map),
 
     def _availClozeOrds(self, m, flds, allowEmpty=True):
 
-        """The list of numbers of cloze field.
+        """The list of fields F which are used in some {{cloze:F}} in a template
 
         keyword arguments:
         m: a model

@@ -57,17 +57,17 @@ class _Collection:
 
     _lastSave -- time of the last save. Initially time of creation.
     _undo -- An undo object. See below
-    
-    The collection is an object composed of: 
+
+    The collection is an object composed of:
     usn -- USN of the collection
     id -- arbitrary number since there is only one row
     crt -- created timestamp
     mod -- last modified in milliseconds
-    scm -- schema mod time: time when "schema" was modified. 
+    scm -- schema mod time: time when "schema" was modified.
         --  If server scm is different from the client scm a full-sync is required
     ver -- version
     dty -- dirty: unused, set to 0
-    usn -- update sequence number: used for finding diffs when syncing. 
+    usn -- update sequence number: used for finding diffs when syncing.
         --   See usn in cards table for more details.
     ls -- "last sync time"
     conf -- object containing configuration options that are synced
@@ -86,25 +86,25 @@ class _Collection:
 
     """
     not in the db:
-    activeDecks -- The active decks, that is, the current deck and its descendent. 
+    activeDecks -- The active decks, that is, the current deck and its descendent.
     curDeck -- the current deck. That is, the last deck which was selected
-    for review or for adding cards. 
+    for review or for adding cards.
     newSpread -- ??
-    collapseTime -- 
-    timeLim -- 
-    estTimes -- 
-    dueCounts -- 
-    other -- 
+    collapseTime --
+    timeLim --
+    estTimes --
+    dueCounts --
+    other --
     curModel -- A model which is, right now, the default model
     nextPos -- the highest due of new cards
-    sortType -- 
-    sortBackwards -- 
+    sortType --
+    sortBackwards --
     addToCur -- add new to currently selected deck?
     """
 
-    """An undo object is of the form     
+    """An undo object is of the form
     [type, undoName, data]
-    Here, type is 1 for review, 2 for checkpoint. 
+    Here, type is 1 for review, 2 for checkpoint.
     undoName is the name of the action to undo. Used in the edit menu,
     and in tooltip stating that undo was done.
     """
@@ -287,7 +287,7 @@ crt=?, mod=?, scm=?, dty=?, usn=?, ls=?, conf=?""",
         """
         if not self.schemaChanged():
             if check and not runFilter("modSchema", True):
-                #default hook is added in aqt/main setupHooks. It is function onSchemaMod from class AnkiQt aqt/main 
+                #default hook is added in aqt/main setupHooks. It is function onSchemaMod from class AnkiQt aqt/main
                 raise AnkiError("abortSchemaMod")
         self.scm = intTime(1000)
         self.setMod()
@@ -396,12 +396,14 @@ crt=?, mod=?, scm=?, dty=?, usn=?, ls=?, conf=?""",
     ##########################################################################
 
     def findTemplates(self, note):
-        "Return (active), non-empty templates."
+        "Return non-empty templates."
         model = note.model()
         avail = self.models.availOrds(model, joinFields(note.fields))
         return self._tmplsFromOrds(model, avail)
 
     def _tmplsFromOrds(self, model, avail):
+        """Given a list of ordinals, returns a list of templates
+        corresponding to those position/cloze"""
         ok = []
         if model['type'] == MODEL_STD:
             for t in model['tmpls']:
@@ -489,7 +491,7 @@ insert into cards values (?,?,?,?,?,?,0,0,?,0,0,0,0,0,0,0,0,"")""",
 
     def previewCards(self, note, type=0):
         """Returns a list of new cards, one by template. Those cards are not flushed, and their due is always 1.
-        
+
         type 0 - when previewing in add dialog, only non-empty
         type 1 - when previewing edit, only existing
         type 2 - when previewing in models dialog, all templates.
@@ -509,7 +511,7 @@ insert into cards values (?,?,?,?,?,?,0,0,?,0,0,0,0,0,0,0,0,"")""",
         return cards
 
     def _newCard(self, note, template, due, flush=True):
-        """A new card object belonging to this collection. 
+        """A new card object belonging to this collection.
         Its nid according to note,
         ord according to template
         did according to template, or to model, or default if otherwise deck is dynamic
@@ -636,9 +638,10 @@ where c.nid = n.id and c.id in %s group by nid""" % ids2str(cids)):
         # gather metadata
         """TODO
 
-        The list of renderQA for each cards whose type belongs to ids. 
+        The list of renderQA for each cards whose type belongs to ids.
 
         Types may be card(default), note, model or all (in this case, ids is not used).
+        It seems to be called nowhere
         """
         if type == "card":
             where = "and c.id in " + ids2str(ids)
@@ -656,9 +659,9 @@ where c.nid = n.id and c.id in %s group by nid""" % ids2str(cids)):
     def _renderQA(self, data, qfmt=None, afmt=None):
         """Returns hash of id, question, answer.
 
-        Keyword arguments:        
+        Keyword arguments:
         data -- [cid, nid, mid, did, ord, tags, flds] (see db
-        documentation for more information about those values) 
+        documentation for more information about those values)
         This corresponds to the information you can obtain in templates, using {{Tags}}, {{Type}}, etc..
         qfmt -- question format string (as in template)
         afmt -- answer format string (as in template)
@@ -675,8 +678,8 @@ where c.nid = n.id and c.id in %s group by nid""" % ids2str(cids)):
         # Deck, Subdeck: their name
         # Card: the template name
         # cn: 1 for n being the ord+1
-        # FrontSide : 
-        model = self.models.get(nid)
+        # FrontSide :
+        model = self.models.get(mid)
         for (name, (idx, conf)) in list(self.models.fieldMap(model).items()):#conf is not used
             fields[name] = flist[idx]
         fields['Tags'] = tags.strip()
@@ -710,7 +713,7 @@ where c.nid = n.id and c.id in %s group by nid""" % ids2str(cids)):
                 fields['FrontSide'] = stripSounds(d['q'])
                 #d['q'] is defined during loop's first iteration
             fields = runFilter("mungeFields", fields, model, data, self) # TODO check
-            html = anki.template.render(format, fields) #probably replace everything of the form {{ by its value TODO check
+            html = anki.template.render(format, fields) #replace everything of the form {{ by its value TODO check
             d[type] = runFilter(
                 "mungeQA", html, type, fields, model, data, self) # TODO check
             # empty cloze?
