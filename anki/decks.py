@@ -46,7 +46,7 @@ id -- configuration ID (automatically generated long). Not present in the defaul
 
 The configuration related to new card is composed of:
 delays -- The list of successive delay between the learning steps of the new cards, as explained in the manual.
-ints -- The delays according to the button pressed while leaving the learning mode.
+ints -- The delay to wait for the next review. In position 1, if the review is easy. In position 0 otherwise.
 initial factor -- The initial ease factor
 separate -- delay between answering Good on a card with no steps left, and seeing the card again. Seems to be unused in the code
 order -- In which order new cards must be shown. NEW_CARDS_RANDOM = 0 and NEW_CARDS_DUE = 1

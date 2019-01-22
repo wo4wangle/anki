@@ -103,6 +103,11 @@ class Scheduler:
         card.flushSched()
 
     def counts(self, card=None):
+        """The three numbers to show in anki deck's list/footer.
+        Number of new cards, learning repetition, review card.
+
+        If cards, then the tuple takes into account the card.
+"""
         counts = [self.newCount, self.lrnCount, self.revCount]
         if card:
             idx = self.countIdx(card)
@@ -131,6 +136,8 @@ order by due""" % (self._deckLimit()),
         return ret
 
     def countIdx(self, card):
+        """In which column the card in the queue should be counted.
+        day_lrn is sent to lrn, otherwise its the identity"""
         if card.queue == QUEUE_DAY_LRN:
             return QUEUE_LRN
         return card.queue
@@ -621,7 +628,7 @@ did = ? and queue = {QUEUE_DAY_LRN} and due <= ? limit ?""",
 
     def _delayForGrade(self, conf, left):
         """The number of second for the delay until the next time the card can
-        be reviewed. Assumng the number of left steps is left,
+        be reviewed. Assuming the number of left steps is left,
         according to configuration conf
 
         """
@@ -645,11 +652,18 @@ did = ? and queue = {QUEUE_DAY_LRN} and due <= ? limit ?""",
             return self._newConf(card)
 
     def _rescheduleAsRev(self, card, conf, early):
-        """ The card is assumed to be in learning mode.
-        Schedule for tomorrow if it's a lapse. Otherwise, as
-        rescheduleNew (todo: copy explanation from rescheduleNew)
+        """ Change schedule for graduation.
 
-        Remove card from filtered deck, update the queue.
+        If it's filtered without rescheduling, remove the card from
+        filtered and do nothing else.
+
+        If it's lapsed, set the due date to tomorrow. Do not change
+        the interval.
+
+        If it's a new card, change interval according to
+        _rescheduleNew. I.e. conf['ints'][1 if early
+        else 0]", change the due date accordingly. Change the easyness
+        to initial one.
         """
         lapse = card.type == CARD_DUE
         if lapse:
@@ -677,6 +691,9 @@ did = ? and queue = {QUEUE_DAY_LRN} and due <= ? limit ?""",
                 card.due = self.col.nextID("pos")
 
     def _startingLeft(self, card):
+        """(number of review to see, number which can be seen today)
+        But instead of a pair (a,b), returns a+1000*b.
+        """
         if card.type == CARD_DUE:
             conf = self._lapseConf(card)
         else:
@@ -686,7 +703,15 @@ did = ? and queue = {QUEUE_DAY_LRN} and due <= ? limit ?""",
         return tot + tod*1000
 
     def _leftToday(self, delays, left, now=None):
-        "The number of steps that can be completed by the day cutoff."
+        """The number of the last ```left``` steps that can be completed
+        before the day cutoff. Assuming the first step is done
+        ```now```.
+
+        delays -- the list of delays
+        left -- the number of step to consider (at the end of the
+        list)
+        now -- the time at which the first step is done.
+        """
         if not now:
             now = intTime()
         delays = delays[-left:]
@@ -699,6 +724,19 @@ did = ? and queue = {QUEUE_DAY_LRN} and due <= ? limit ?""",
         return ok+1
 
     def _graduatingIvl(self, card, conf, early, adj=True):
+        """
+        The interval before the next review.
+        If its lapsed card in a filtered deck, then use _dynIvlBoost.
+        Otherwise, if button was easy or not, use the 'ints' value
+        according to conf parameter.
+        Maybe apply some fuzzyness according to adj
+
+        Card is supposed to be in learning.
+        card -- a card object
+        conf -- the configuration dictionnary for this kind of card
+        early -- whether "easy" was pressed
+        adj -- whether to add fuzziness
+        """
         if card.type == CARD_DUE:
             # lapsed card being relearnt
             if card.odid:
@@ -720,8 +758,12 @@ did = ? and queue = {QUEUE_DAY_LRN} and due <= ? limit ?""",
         """Reschedule a new card that's graduated for the first time.
 
         Set its factor according to conf.
-        Set its interval and due date according to _graduatingIvl
-        (TODO, copy from _graduatingIvl)
+        Set its interval. If it's lapsed in dynamic deck, use
+        _dynIvlBoost.
+        Otherwise, the interval is found in conf['ints'][1 if early
+        else 0].
+        Change due date according to the interval.
+        Put initial factor.
         """
         card.ivl = self._graduatingIvl(card, conf, early)
         card.due = self.today+card.ivl
@@ -869,6 +911,18 @@ select id from cards where did in %s and queue = {QUEUE_REV} and due <= ? limit 
     ##########################################################################
 
     def _answerRevCard(self, card, ease):
+        """
+        move the card out of filtered if required
+        change the queue
+
+        if not (filtered without rescheduling):
+        change interval
+        change due
+        change factor
+        change lapse if BUTTON_ONE
+
+        log this review
+        """
         delay = 0
         if ease == BUTTON_ONE:
             delay = self._rescheduleLapse(card)
@@ -877,6 +931,25 @@ select id from cards where did in %s and queue = {QUEUE_REV} and due <= ? limit 
         self._logRev(card, ease, delay)
 
     def _rescheduleLapse(self, card):
+        """
+        The number of second for the delay until the next time the card can
+        be reviewed. 0 if it should not be reviewed (because leech, or
+        because conf['delays'] is empty)
+
+        Called the first time we press "again" on a review card.
+
+
+        Unless filtered without reschedule:
+        lapse incread
+        ivl changed
+        factor decreased by 200
+        due changed.
+
+        if leech, suspend and return 0.
+
+        card -- review card
+        """
+
         conf = self._lapseConf(card)
         card.lastIvl = card.ivl
         if self._resched(card):
@@ -890,15 +963,16 @@ select id from cards where did in %s and queue = {QUEUE_REV} and due <= ? limit 
         # if suspended as a leech, nothing to do
         delay = 0
         if self._checkLeech(card, conf) and card.queue == QUEUE_SUSPENDED:
-            return delay
+            return delay#i.e. return 0
         # if no relearning steps, nothing to do
         if not conf['delays']:
-            return delay
+            return delay#i.e. return 0
         # record rev due date for later
         if not card.odue:
             card.odue = card.due
         delay = self._delayForGrade(conf, 0)
         card.due = int(delay + time.time())
+        #number of rev+1000*number of rev to do today
         card.left = self._startingLeft(card)
         # queue LRN
         if card.due < self.dayCutoff:
@@ -916,6 +990,18 @@ select id from cards where did in %s and queue = {QUEUE_REV} and due <= ? limit 
         return max(conf['minInt'], int(card.ivl*conf['mult']))
 
     def _rescheduleRev(self, card, ease):
+        """Update the card according to review.
+
+        If it's filtered, remove from filtered. If the filtered deck
+        states not to update, nothing else is done.
+
+        Change the interval. Change the due date. Change the factor.
+
+
+        ease -- button pressed. Between 2 and 4
+        card -- assumed to be in review mode
+
+        """
         # update interval
         card.lastIvl = card.ivl
         if self._resched(card):
@@ -931,6 +1017,7 @@ select id from cards where did in %s and queue = {QUEUE_REV} and due <= ? limit 
             card.odue = 0
 
     def _logRev(self, card, ease, delay):
+        """Log this review. Retry once if failed"""
         def log():
             self.col.db.execute(
                 "insert into revlog values (?,?,?,?,?,?,?,?,?)",
@@ -948,7 +1035,10 @@ select id from cards where did in %s and queue = {QUEUE_REV} and due <= ? limit 
     ##########################################################################
 
     def _nextRevIvl(self, card, ease):
-        "Ideal next interval for CARD, given EASE."
+        """Ideal next interval for CARD, given EASE.
+
+        Fuzzyness not applied.
+        Cardds assumed to be a review card succesfully reviewed."""
         delay = self._daysLate(card)
         conf = self._revConf(card)
         fct = card.factor / 1000
@@ -966,10 +1056,24 @@ select id from cards where did in %s and queue = {QUEUE_REV} and due <= ? limit 
         return min(interval, conf['maxIvl'])
 
     def _fuzzedIvl(self, ivl):
+        """Return a randomly chosen number of day for the interval,
+        not far from ivl.
+
+        See ../documentation/computing_intervals for a clearer version
+        of this documentation
+        """
         min, max = self._fuzzIvlRange(ivl)
         return random.randint(min, max)
 
     def _fuzzIvlRange(self, ivl):
+        """Return an increasing pair of numbers.  The new interval will be a
+        number randomly selected between the first and the second
+        element.
+
+        See ../documentation/computing_intervals for a clearer version
+        of this documentation
+
+        """
         if ivl < 2:
             return [1, 1]
         elif ivl == 2:
@@ -985,7 +1089,9 @@ select id from cards where did in %s and queue = {QUEUE_REV} and due <= ? limit 
         return [ivl-fuzz, ivl+fuzz]
 
     def _constrainedIvl(self, ivl, conf, prev):
-        "Integer interval after interval factor and prev+1 constraints applied."
+        """A new interval. Ivl multiplie by the interval
+        factor of this conf. Greater than prev.
+        """
         new = ivl * conf.get('ivlFct', 1)
         return int(max(new, prev+1))
 
@@ -995,11 +1101,24 @@ select id from cards where did in %s and queue = {QUEUE_REV} and due <= ? limit 
         return max(0, self.today - due)
 
     def _updateRevIvl(self, card, ease):
+        """ Compute the next interval, fuzzy it, ensure ivl increase
+        and is at most maxIvl.
+
+        Card is assumed to be a review card."""
         idealIvl = self._nextRevIvl(card, ease)
-        card.ivl = min(max(self._adjRevIvl(card, idealIvl), card.ivl+1),
-                       self._revConf(card)['maxIvl'])
+        fuzzedIvl = self._adjRevIvl(card, idealIvl)
+        increasedIvl = max(fuzzedIvlcard.ivl+1)
+        card.ivl = min(increasedIvl, self._revConf(card)['maxIvl'])
 
     def _adjRevIvl(self, card, idealIvl):
+        """Return an interval, similar to idealIvl, but randomized.
+        See ../documentation/computing_intervals for the rule to
+        generate this fuzziness.
+
+        if _speadRev is to False (by an Add-on, I guess), it returns
+        the input exactly.
+
+        card is not used."""
         if self._spreadRev:
             idealIvl = self._fuzzedIvl(idealIvl)
         return idealIvl
