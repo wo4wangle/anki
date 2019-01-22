@@ -58,6 +58,11 @@ class Scheduler:
         self._haveQueues = True
 
     def answerCard(self, card, ease):
+        """Change the number of card to see in the decks and its
+        ancestors. Change the due/interval/ease factor of this card,
+        according to the button ease.
+
+        """
         self.col.log()
         assert 1 <= ease <= 4
         self.col.markReview(card)
@@ -84,7 +89,8 @@ class Scheduler:
             self._updateStats(card, 'new')
         if card.queue in (QUEUE_LRN, QUEUE_DAY_LRN):
             self._answerLrnCard(card, ease)
-            if not wasNewQ:
+            if not wasNewQ:# if wasNewQ holds, updating already
+                # happened above
                 self._updateStats(card, 'lrn')
         elif card.queue == QUEUE_REV:
             self._answerRevCard(card, ease)
@@ -164,6 +170,13 @@ order by due""" % (self._deckLimit()),
     ##########################################################################
 
     def _updateStats(self, card, type, cnt=1):
+        """Change the number of review/new/learn cards to see today in card's
+        deck, and in all of its ancestors. The number of card to see
+        is decreased by cnt.
+
+        if type is time, it adds instead the time taken in this card
+        to this decks and all of its ancestors.
+        """
         key = type+"Today"
         for g in ([self.col.decks.get(card.did)] +
                   self.col.decks.parents(card.did)):
@@ -632,6 +645,12 @@ did = ? and queue = {QUEUE_DAY_LRN} and due <= ? limit ?""",
             return self._newConf(card)
 
     def _rescheduleAsRev(self, card, conf, early):
+        """ The card is assumed to be in learning mode.
+        Schedule for tomorrow if it's a lapse. Otherwise, as
+        rescheduleNew (todo: copy explanation from rescheduleNew)
+
+        Remove card from filtered deck, update the queue.
+        """
         lapse = card.type == CARD_DUE
         if lapse:
             if self._resched(card):
@@ -641,6 +660,8 @@ did = ? and queue = {QUEUE_DAY_LRN} and due <= ? limit ?""",
             card.odue = 0
         else:
             self._rescheduleNew(card, conf, early)
+        # Interval is now set. We must deal with queue and moving deck
+        # if dynamic.
         card.queue = QUEUE_REV
         card.type = CARD_DUE
         # if we were dynamic, graduating means moving back to the old deck
@@ -696,7 +717,12 @@ did = ? and queue = {QUEUE_DAY_LRN} and due <= ? limit ?""",
             return ideal
 
     def _rescheduleNew(self, card, conf, early):
-        "Reschedule a new card that's graduated for the first time."
+        """Reschedule a new card that's graduated for the first time.
+
+        Set its factor according to conf.
+        Set its interval and due date according to _graduatingIvl
+        (TODO, copy from _graduatingIvl)
+        """
         card.ivl = self._graduatingIvl(card, conf, early)
         card.due = self.today+card.ivl
         card.factor = conf['initialFactor']
@@ -1077,9 +1103,20 @@ odue = (case when odue then odue else due end),
 did = ?, queue = %s, due = ?, usn = ? where id = ?""" % queue, data)
 
     def _dynIvlBoost(self, card):
+        """New interval for a review card in a dynamic interval.
+
+        Maximum between old interval and
+        elapsed*((card.factor/1000)+1.2)/2, with elapsed being the
+        time between today and the last review.
+
+        This number is constrained to be between 1 and the parameter
+        ```maxIvl``` of the card's configuration.
+
+        """
         assert card.odid and card.type == CARD_DUE
         assert card.factor
-        elapsed = card.ivl - (card.odue - self.today)
+        lastReview = (card.odue - card.ivl)
+        elapsed = self.today - lastReview
         factor = ((card.factor/1000)+1.2)/2
         ivl = int(max(card.ivl, elapsed * factor, 1))
         conf = self._revConf(card)
