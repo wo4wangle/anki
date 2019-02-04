@@ -16,7 +16,7 @@ class Exporter:
         self.did = did
 
     def exportInto(self, path):
-        """Export into path. 
+        """Export into path.
 
         This is the method called from the GUI to actually export things.
 
@@ -238,7 +238,7 @@ class AnkiExporter(Exporter):
         # overwrite to apply customizations to the deck before it's closed,
         # such as update the deck description
         pass
-    
+
     def removeSystemTags(self, tags):
         return self.src.tags.remFromStr("marked leech", tags)
 
