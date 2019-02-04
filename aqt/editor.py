@@ -151,7 +151,9 @@ class Editor:
     def _addButton(self, icon, cmd, tip="", label="", id=None, toggleable=False,
                    disables=True):
         if icon:
-            if os.path.isabs(icon):
+            if icon.startswith("qrc:/"):
+                iconstr = icon
+            elif os.path.isabs(icon):
                 iconstr = self.resourceToData(icon)
             else:
                 iconstr = "/_anki/imgs/{}.png".format(icon)
@@ -293,7 +295,8 @@ class Editor:
             print("uncaught cmd", cmd)
 
     def mungeHTML(self, txt):
-        txt = re.sub(r"<br>$", "", txt)
+        if txt in ('<br>', '<div><br></div>'):
+            return ''
         return txt
 
     # Setting/unsetting the current note
@@ -992,6 +995,8 @@ class EditorWebView(AnkiWebView):
         # add a comment in the clipboard html so we can tell text is copied
         # from us and doesn't need to be stripped
         clip = self.editor.mw.app.clipboard()
+        if not clip.ownsClipboard():
+            return
         mime = clip.mimeData()
         if not mime.hasHtml():
             return
