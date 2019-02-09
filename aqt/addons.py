@@ -72,7 +72,7 @@ class AddonManager:
 
         dir -- TODO
         """
-        
+
         root = self.mw.pm.addonFolder()
         if not dir:
             return root
@@ -238,16 +238,16 @@ When loading '%(name)s':
     ######################################################################
 
     """Dictionnary from modules to function to apply when add-on
-    manager is called on this config.""" 
+    manager is called on this config."""
     _configButtonActions = {}
     """Dictionnary from modules to function to apply when add-on
     manager ends an update. Those functions takes the configuration,
-    parsed as json, in argument.""" 
+    parsed as json, in argument."""
     _configUpdatedActions = {}
 
     def addonConfigDefaults(self, dir):
         """The (default) configuration of the addon whose
-name/directory is dir.
+        name/directory is dir.
 
         This file should be called config.json"""
         path = os.path.join(self.addonsFolder(dir), "config.json")
@@ -277,7 +277,7 @@ name/directory is dir.
 
     def configUpdatedAction(self, addon):
         """The function to call for addon when add-on edition has been done
-        using add-on manager. 
+        using add-on manager.
 
         """
         return self._configUpdatedActions.get(addon)
@@ -311,7 +311,7 @@ name/directory is dir.
 
         module -- __name__ from module's code
         fn -- A function taking the configuration, parsed as json, in
-        argument. 
+        argument.
         """
         addon = self.addonFromModule(module)
         self._configUpdatedActions[addon] = fn

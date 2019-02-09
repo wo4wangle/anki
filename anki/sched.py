@@ -21,6 +21,16 @@ from anki.hooks import runHook
 class Scheduler:
     """
     today -- difference between the last time scheduler is seen and creation of the collection.
+    dayCutoff -- The timestamp of when today end.
+    reportLimit -- the maximal number to show in main windows
+    lrnCount --  The number of cards in learning in selected decks
+    revCount -- number of cards to review today in selected decks
+    newCount -- number of new cards to see today in selected decks
+    _lrnDids, _revDids, _newDids -- a copy of the set of active decks
+    _newQueue, _lrnQueue, _revQueue -- todo
+    _lrnDayQueue -- todo
+    newCardModulus -- each card in position 0 Modulo newCardModulus is a new card. Or it is 0 if new cards are not mixed with reviews.
+    -- _haveQueues -- whether the number of cards to see today for current decks have been set.
     """
     name = "std"
     haveCustomStudy = True
@@ -51,6 +61,11 @@ class Scheduler:
             return card
 
     def reset(self):
+        """
+        Deal with the fact that it's potentially a new day.
+        Reset number of learning, review, new cards according to current decks
+        empty queues. Set haveQueues to true
+        """
         self._updateCutoff()
         self._resetLrn()
         self._resetRev()
@@ -390,6 +405,7 @@ did = ? and queue = {QUEUE_NEW_CRAM} limit ?)""", did, lim)
         self.newCount = self._walkingCount(self._deckNewLimitSingle, cntFn)
 
     def _resetNew(self):
+        """Set newCount, newDids, newCardModulus. Empty newQueue. """
         self._resetNewCount()
         self._newDids = self.col.decks.active()[:]
         self._newQueue = []
@@ -425,6 +441,8 @@ did = ? and queue = {QUEUE_NEW_CRAM} limit ?)""", did, lim)
             return self.col.getCard(self._newQueue.pop())
 
     def _updateNewCardRatio(self):
+        """set newCardModulus so that new cards are regularly mixed with review cards. At least 2.
+        Only if new and review should be mixed"""
         if self.col.conf['newSpread'] == NEW_CARDS_DISTRIBUTE:
             if self.newCount:
                 self.newCardModulus = (
@@ -491,19 +509,21 @@ select id from cards where did in %s and queue = {QUEUE_NEW_CRAM} limit ?)"""
     ##########################################################################
 
     def _resetLrnCount(self):
-        # sub-day
+        """Set lrnCount"""
+        # Number of reps which are due today, last seen today caped by report limit, in the selected decks
         self.lrnCount = self.col.db.scalar(f"""
 select sum(left/1000) from (select left from cards where
 did in %s and queue = {QUEUE_LRN} and due < ? limit %d)""" % (
-            self._deckLimit(), , self.reportLimit),
+            self._deckLimit(), self.reportLimit),
             self.dayCutoff) or 0
-        # day
+        # Number of cards in learning which are due today, last seen another day caped by report limit, in the selected decks
         self.lrnCount += self.col.db.scalar(f"""
 select count() from cards where did in %s and queue = {QUEUE_DAY_LRN}
 and due <= ? limit %d""" % (self._deckLimit(),  self.reportLimit),
                                             self.today)
 
     def _resetLrn(self):
+        """Set lrnCount and _lrnDids. Empty _lrnQueue, lrnDayQueu."""
         self._resetLrnCount()
         self._lrnQueue = []
         self._lrnDayQueue = []
@@ -796,7 +816,7 @@ did = ? and queue = {QUEUE_DAY_LRN} and due <= ? limit ?""",
         self.col.db.execute(f"""
 update cards set
 due = odue, queue = {QUEUE_REV}, mod = %d, usn = %d, odue = 0
-where queue in (QUEUE_LRN,QUEUE_DAY_LRN) and type = CARD_DUE
+where queue in ({QUEUE_LRN},{QUEUE_DAY_LRN) and type = {CARD_DUE}
 %s
 """ % (intTime(), self.col.usn(), extra))
         # new cards in learning
@@ -845,7 +865,9 @@ and due <= ? limit ?)""",
             did, self.today, lim)
 
     def _resetRevCount(self):
+        """Set revCount"""
         def cntFn(did, lim):
+            """Number of review cards to see today"""
             return self.col.db.scalar(f"""
 select count() from (select id from cards where
 did = ? and queue = {QUEUE_REV} and due <= ? limit %d)""" % (lim),
@@ -854,6 +876,7 @@ did = ? and queue = {QUEUE_REV} and due <= ? limit %d)""" % (lim),
             self._deckRevLimitSingle, cntFn)
 
     def _resetRev(self):
+        """Set revCount, empty _revQueue, _revDids"""
         self._resetRevCount()
         self._revQueue = []
         self._revDids = self.col.decks.active()[:]
@@ -1354,6 +1377,13 @@ did = ?, queue = %s, due = ?, usn = ? where id = ?""" % queue, data)
     ##########################################################################
 
     def _updateCutoff(self):
+        """
+        For each deck, set its entry *Today's first element to today's date
+        if it's a new day:
+        - log the new day
+        - unbury new cards
+        - change today and daycutoff
+        """
         oldToday = self.today
         # days since col created
         self.today = int((time.time() - self.col.crt) // 86400)

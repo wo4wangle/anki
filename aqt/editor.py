@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 # Copyright: Damien Elmes <anki@ichi2.net>
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
-"""The part of the window used to edit notes. It is used for adding note, editing existing note, and as the lower part of the browser.
+"""
+The part of the window used to edit notes. It is used for adding
+note, editing existing note, and as the lower part of the browser.
+
 """
 
 import re
@@ -136,7 +139,7 @@ class Editor:
             return 'data:%s;base64,%s' % (mime, data64.decode('ascii'))
 
 
-    def addButton(self, icon, cmd, func, tip="", label="", 
+    def addButton(self, icon, cmd, func, tip="", label="",
                   id=None, toggleable=False, keys=None, disables=True):
         """Assign func to bridge cmd, register shortcut, return button"""
         if cmd not in self._links:
@@ -304,7 +307,11 @@ class Editor:
 
     def setNote(self, note, hide=True, focusTo=None):
         """Make NOTE the current note.
-        
+
+        if note is Falsy:
+        Remove tags's line.
+
+
         keyword arguments:
         note -- the new note in the editor
         hide -- whether to hide the current widget
@@ -323,7 +330,7 @@ class Editor:
         self.loadNote(self.currentField)
 
     def loadNote(self, focusTo=None):
-        """Todo 
+        """Todo
 
         keyword -- the index of the field in which the focus should start"""
         if not self.note:
@@ -470,6 +477,7 @@ class Editor:
             self.mw.col.models.save(m)
 
     def hideCompleters(self):
+        "Remove tags's line"
         self.tags.hideCompleter()
 
     def onFocusTags(self):

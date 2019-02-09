@@ -32,6 +32,19 @@ from aqt.utils import saveGeom, restoreGeom, showInfo, showWarning, \
 import sip
 
 class AnkiQt(QMainWindow):
+    """
+    col -- The collection
+    state -- It's states which kind of content main shows. Either:
+      -- startup
+      -- resetRequired: during review, when edit or browser is opened, the window show "waiting for editing to finish. Resume now
+      -- sync
+      -- overview
+      -- review
+      -- profileManager
+      -- deckBrowser
+    stateShortcuts -- shortcuts related to the kind of window currently in main.
+    bottomWeb -- a ankiwebview, with the bottom of the main window. Shown unless for reset required.
+    """
     def __init__(self, app, profileManager, opts, args):
         QMainWindow.__init__(self)
         self.state = "startup"
@@ -458,6 +471,12 @@ from the profile screen."))
     ##########################################################################
 
     def moveToState(self, state, *args):
+        """Call self._oldStateCleanup(state) if it exists for oldState. It seems it's the
+        case only for review.
+        remove shortcut related to this state
+        run hooks beforeStateChange and afterStateChange. By default they are empty.
+        show the bottom, unless its reset required.
+        """
         #print("-> move from", self.state, "to", state)
         oldState = self.state or "dummy"
         cleanup = getattr(self, "_"+oldState+"Cleanup", None)
@@ -499,6 +518,7 @@ from the profile screen."))
         self.reviewer.show()
 
     def _reviewCleanup(self, newState):
+        """Run hook "reviewCleanup". Unless new state is resetRequired or review."""
         if newState != "resetRequired" and newState != "review":
             self.reviewer.cleanup()
 
@@ -510,7 +530,23 @@ from the profile screen."))
     ##########################################################################
 
     def reset(self, guiOnly=False):
-        "Called for non-trivial edits. Rebuilds queue and updates UI."
+        """Called for non-trivial edits. Rebuilds queue and updates UI.
+
+        set Edit>undo
+        change state (show the bottom bar, remove shortcut from last state)
+        run hooks beforeStateChange and afterStateChange. By default they are empty.
+        call cleanup of last state.
+        call the hook "reset". It contains at least the onReset method
+        from the current window if it is browser, (and its
+        changeModel), editCurrent, addCard, studyDeck,
+        modelChooser. Reset reinitialize those window without closing
+        them.
+
+        unless guiOnly:
+        Deal with the fact that it's potentially a new day.
+        Reset number of learning, review, new cards according to current decks
+        empty queues. Set haveQueues to true.
+        """
         if self.col:
             if not guiOnly:
                 self.col.reset()
@@ -705,14 +741,14 @@ title="%s" %s>%s</button>''' % (
 QMenuBar {
   border-bottom: 1px solid #aaa;
   background: white;
-}        
+}
 """
             # qt bug? setting the above changes the browser sidebar
             # to white as well, so set it back
             buf += """
 QTreeWidget {
   background: #eee;
-}            
+}
             """
 
         # allow addons to modify the styling
@@ -800,7 +836,8 @@ QTreeWidget {
         self.maybeEnableUndo()
 
     def maybeEnableUndo(self):
-        if self.col and self.col.undoName():
+        """Enable undo in the GUI if something can be undone. Call the hook undoState(somethingCanBeUndone)."""
+        if self.col and self.col.undoName():#Whether something can be undone
             self.form.actionUndo.setText(_("Undo %s") %
                                             self.col.undoName())
             self.form.actionUndo.setEnabled(True)
@@ -836,7 +873,7 @@ QTreeWidget {
         aqt.dialogs.open("EditCurrent", self)
 
     def onDeckConf(self, deck=None):
-        """Open the deck editor. 
+        """Open the deck editor.
 
         According to whether the deck is dynamic or not, open distinct window
         keyword arguments:
@@ -1042,7 +1079,7 @@ and if the problem comes up again, please ask on the support site."""))
     def onRemNotes(self, col, nids):
         """Append (id, model id and fields) to the end of deleted.txt
 
-        This is done for each id of nids.        
+        This is done for each id of nids.
         This method is added to the hook remNotes; and executed on note deletion.
         """
         path = os.path.join(self.pm.profileFolder(), "deleted.txt")
@@ -1163,7 +1200,7 @@ will be lost. Continue?"""))
 
     def onEmptyCards(self):
         """Method called by Tools>Empty Cards..."""
-        
+
         self.progress.start(immediate=True)
         cids = self.col.emptyCids()
         if not cids:

@@ -1,6 +1,7 @@
 # Copyright: Damien Elmes <anki@ichi2.net>
 # -*- coding: utf-8 -*-
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+"""The window obtained from main by pressing A, or clicking on "Add"."""
 from anki.lang import _
 
 from aqt.qt import *
@@ -106,15 +107,17 @@ class AddCards(QDialog):
         self.editor.setNote(note)
 
     def onReset(self, model=None, keep=False):
-        """Create a new note and set it.
+        """Create a new note and set it with the current field values.
 
         keyword arguments
         model -- not used
-        keep -- Whether the old note was kept. In this case, remove non sticy fields. Otherwise remove this temporary note.
+        keep -- Whether the old note was saved in the collection. In
+        this case, remove non sticky fields. Otherwise remove the last
+        temporary note (it is replaced by a new one).
         """
         #Called with keep set to True from  _addCards
         #Called with default keep __init__, from hook "reset"
-        #Meaning of the word keep guessed. Not clear. 
+        #Meaning of the word keep guessed. Not clear.
         oldNote = self.editor.note
         note = self.mw.col.newNote()
         flds = note.model()['flds']
@@ -217,7 +220,7 @@ question on all cards."""), help="AddItems")
         return QDialog.keyPressEvent(self, evt)
 
     def reject(self):
-        """Close the window. 
+        """Close the window.
 
         If data would be lost, ask for confirmation"""
         self.ifCanClose(self._reject)

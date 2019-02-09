@@ -61,7 +61,7 @@ class _Collection:
     The collection is an object composed of:
     usn -- USN of the collection
     id -- arbitrary number since there is only one row
-    crt -- created timestamp
+    crt -- timestamp of the creation date. It's correct up to the day. For V1 scheduler, the hour corresponds to starting a newday.
     mod -- last modified in milliseconds
     scm -- schema mod time: time when "schema" was modified.
         --  If server scm is different from the client scm a full-sync is required
@@ -340,7 +340,7 @@ crt=?, mod=?, scm=?, dty=?, usn=?, ls=?, conf=?""",
         return id
 
     def reset(self):
-        "Rebuild the queue and reload data after DB modified."
+        """See sched's reset documentation"""
         self.sched.reset()
 
     # Deletion logging
