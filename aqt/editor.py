@@ -332,7 +332,7 @@ class Editor:
     def loadNote(self, focusTo=None):
         """Todo
 
-        keyword -- the index of the field in which the focus should start"""
+        focusTo -- Whether focus should be set to some field."""
         if not self.note:
             return
 

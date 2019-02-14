@@ -424,9 +424,9 @@ crt=?, mod=?, scm=?, dty=?, usn=?, ls=?, conf=?""",
         """
         # build map of (nid,ord) so we don't create dupes
         snids = ids2str(nids)
-        have = {}
-        dids = {}
-        dues = {}
+        have = {}#Associated to each nid a dictionnary from card's order to card id.
+        dids = {}#Associate to each nid the only deck id containing its cards. Or None if there are multiple decks
+        dues = {}#Associate to each nid the due value of the last card seen.
         for id, nid, ord, did, due, odue, odid in self.db.execute(
             "select id, nid, ord, did, due, odue, odid from cards where nid in "+snids):
             # existing cards
@@ -451,10 +451,10 @@ crt=?, mod=?, scm=?, dty=?, usn=?, ls=?, conf=?""",
             if nid not in dues:
                 dues[nid] = due
         # build cards for each note
-        data = []
+        data = []#Tuples for cards to create. Each tuple is newCid, nid, did, ord, now, usn, due
         ts = maxID(self.db)
         now = intTime()
-        rem = []
+        rem = []#cards to remove
         usn = self.usn()
         for nid, mid, flds in self.db.execute(
             "select id, mid, flds from notes where id in "+snids):

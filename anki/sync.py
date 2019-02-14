@@ -472,6 +472,7 @@ class AnkiRequestsClient:
         return buf.getvalue()
 
     def _agentName(self):
+        """Anki versionNumber"""
         from anki import version
         return "Anki {}".format(version)
 

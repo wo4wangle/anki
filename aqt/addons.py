@@ -197,6 +197,7 @@ When loading '%(name)s':
     ######################################################################
 
     def checkForUpdates(self):
+        """The list of add-ons not up to date. Compared to the server's information."""
         client = AnkiRequestsClient()
 
         # get mod times
@@ -219,6 +220,10 @@ When loading '%(name)s':
             self.mw.progress.finish()
 
     def _getModTimes(self, client, chunk):
+        """The list of (id,mod time) for add-ons whose id is in chunk.
+
+        client -- an ankiRequestsclient
+        chunck -- a list of add-on number"""
         resp = client.get(
             aqt.appShared + "updates/" + ",".join(chunk))
         if resp.status_code == 200:
@@ -227,6 +232,8 @@ When loading '%(name)s':
             raise Exception("Unexpected response code from AnkiWeb: {}".format(resp.status_code))
 
     def _updatedIds(self, mods):
+        """Given a list of (id,last mod on server), returns the sublist of
+        add-ons not up to date."""
         updated = []
         for dir, ts in mods:
             sid = str(dir)

@@ -157,7 +157,7 @@ class ModelManager:
             if templates:
                 self._syncTemplates(m)
         self.changed = True
-        runHook("newModel")
+        runHook("newModel") # By default, only refresh side bar of browser
 
     def flush(self):
         "Flush the registry if any models were changed."
@@ -364,9 +364,7 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
         self.save(m)
 
     def addField(self, m, field):
-        """Append the field field as last element of the model m.
-
-        todo
+        """Append the field field as last fields of the model m.
 
         Keyword arguments
         m -- a model
@@ -444,6 +442,8 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
         """Rename the field. In each template, find the mustache related to
         this field and change them.
 
+        m -- the model dictionnary
+        field -- the field dictionnary
         newName -- either a name. Or None if the field is deleted.
 
         """
@@ -467,8 +467,7 @@ and notes.mid = ? and cards.ord = ?""", m['id'], ord)
 
     def _updateFieldOrds(self, m):
         """
-        Change the order of the field of the model in order to copy
-        the order in m['flds'].
+        Put correct values of f['ord'] for each fields of model m.
 
         Keyword arguments
         m -- a model"""
@@ -699,6 +698,7 @@ select id from notes where mid = ?)""" % " ".join(map),
     ##########################################################################
 
     def _updateRequired(self, m):
+        """Entirely recompute the model's req value"""
         if m['type'] == MODEL_CLOZE:
             # nothing to do
             return
@@ -711,7 +711,10 @@ select id from notes where mid = ?)""" % " ".join(map),
 
     def _reqForTemplate(self, m, flds, t):
         """A rule which is supposed to determine whether a card should be
-        generated or not according to its fields. See ../documentation/templates_generation_rules.md
+        generated or not according to its fields.
+
+        See ../documentation/templates_generation_rules.md
+
         """
         a = []
         b = []
@@ -753,14 +756,17 @@ select id from notes where mid = ?)""" % " ".join(map),
         return type, req
 
     def availOrds(self, m, flds):
-        "Given a joined field string, return available template ordinals. See
-        ../documentation/templates_generation_rules.md for the detail"
+        "Given a joined field string, return template ordinals which should be
+        seen. See ../documentation/templates_generation_rules.md for
+        the detail
+
+        "
         if m['type'] == MODEL_CLOZE:
             return self._availClozeOrds(m, flds)
         fields = {}
         for c, f in enumerate(splitFields(flds)):
             fields[c] = f.strip()
-        avail = []
+        avail = []#List of ord of cards which would be generated
         for ord, type, req in m['req']:
             # unsatisfiable template
             if type == "none":
