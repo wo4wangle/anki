@@ -1,4 +1,4 @@
-# Copyright: Damien Elmes <anki@ichi2.net>
+# Copyright: Ankitects Pty Ltd and contributors
 # -*- coding: utf-8 -*-
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
@@ -31,7 +31,7 @@ class EditCurrent(QDialog):
         self.mw.requireReset()
         self.show()
         # reset focus after open
-        self.editor.web.setFocus()
+        self.mw.progress.timer(100, self.editor.web.setFocus, False)
 
     def onReset(self):
         """

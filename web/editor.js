@@ -1,3 +1,6 @@
+/* Copyright: Ankitects Pty Ltd and contributors
+ * License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html */
+
 var currentField = null;
 var changeTimer = null;
 var dropTarget = null;
@@ -24,6 +27,7 @@ function saveNow(keepFocus) {
     if (keepFocus) {
         saveField("key");
     } else {
+        // triggers onBlur, which saves
         currentField.blur();
     }
 }
@@ -207,28 +211,28 @@ function caretToEnd() {
 }
 
 function onBlur() {
-    if (currentField) {
-        saveField("blur");
-        clearChangeTimer();
+    if (!currentField) {
+        return;
     }
 
     if (document.activeElement === currentField) {
         // other widget or window focused; current field unchanged
-        return;
+        saveField("key");
+    } else {
+        saveField("blur");
+        currentField = null;
+        disableButtons();
     }
-
-    currentField = null;
-    disableButtons();
 }
 
 function saveField(type) {
+    clearChangeTimer();
     if (!currentField) {
         // no field has been focused yet
         return;
     }
     // type is either 'blur' or 'key'
     pycmd(type + ":" + currentFieldOrdinal() + ":" + currentNoteId + ":" + currentField.innerHTML);
-    clearChangeTimer();
 }
 
 function currentFieldOrdinal() {

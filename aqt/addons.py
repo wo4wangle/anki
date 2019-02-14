@@ -1,4 +1,4 @@
-# Copyright: Damien Elmes <anki@ichi2.net>
+# Copyright: Ankitects Pty Ltd and contributors
 # -*- coding: utf-8 -*-
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 """Module for managing add-ons.
@@ -382,6 +382,8 @@ class AddonsDialog(QDialog):
         self.form.addonList.addItems([r[0] for r in self.addons])
         if self.addons:
             self.form.addonList.setCurrentRow(0)
+
+        self.form.addonList.repaint()
 
     def _onAddonItemSelected(self, row_int):
         try:

@@ -1,4 +1,4 @@
-# Copyright: Damien Elmes <anki@ichi2.net>
+# Copyright: Ankitects Pty Ltd and contributors
 # -*- coding: utf-8 -*-
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
@@ -40,7 +40,6 @@ def showInfo(text, parent=False, help="", type="info", title="Anki"):
     mb = QMessageBox(parent)
     mb.setText(text)
     mb.setIcon(icon)
-    mb.setWindowModality(Qt.WindowModal)
     mb.setWindowTitle(title)
     b = mb.addButton(QMessageBox.Ok)
     b.setDefault(True)
@@ -329,9 +328,26 @@ def restoreGeom(widget, key, offset=None, adjustSize=False):
                 # bug in osx toolkit
                 s = widget.size()
                 widget.resize(s.width(), s.height()+offset*2)
+        ensureWidgetInScreenBoundaries(widget)
     else:
         if adjustSize:
             widget.adjustSize()
+
+def ensureWidgetInScreenBoundaries(widget):
+    handle = widget.window().windowHandle()
+    if not handle:
+        # window has not yet been shown, retry later
+        aqt.mw.progress.timer(50, lambda: ensureWidgetInScreenBoundaries(widget), False)
+        return
+
+    # ensure qt has restored the window within the screen's bounds,
+    # and at least 50px from bottom right
+    geom = handle.screen().availableGeometry()
+    pos = widget.pos()
+    x = min(max(geom.x(), pos.x()), geom.width()+geom.x()-50)
+    y = min(max(geom.y(), pos.y()), geom.height()+geom.y()-50)
+    if pos.x() != x or pos.y() != y:
+        widget.move(x, y)
 
 def saveState(widget, key):
     key += "State"
@@ -431,7 +447,7 @@ text msg."""
         aw.mapToGlobal(QPoint(0, -100 + aw.height())))
     lab.show()
     _tooltipTimer = aqt.mw.progress.timer(
-        period, closeTooltip, False)
+        period, closeTooltip, False, requiresCollection=False)
     _tooltipLabel = lab
 
 def closeTooltip():
@@ -536,6 +552,12 @@ class MenuItem:
     def renderTo(self, qmenu):
         a = qmenu.addAction(self.title)
         a.triggered.connect(self.func)
+
+def qtMenuShortcutWorkaround(qmenu):
+    if qtminor < 10:
+        return
+    for act in qmenu.actions():
+        act.setShortcutVisibleInContextMenu(True)
 
 ######################################################################
 

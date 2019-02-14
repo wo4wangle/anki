@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright: Damien Elmes <anki@ichi2.net>
+# Copyright: Ankitects Pty Ltd and contributors
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 """This module deals with models, known as note type in Anki's documentation.
@@ -721,10 +721,10 @@ select id from notes where mid = ?)""" % " ".join(map),
         for f in flds:
             a.append("ankiflag")
             b.append("")
-        data = [1, 1, m['id'], 1, t['ord'], "", joinFields(a)]
+        data = [1, 1, m['id'], 1, t['ord'], "", joinFields(a), 0]
         # The html of the card at position ord where each field's content is "ankiflag"
         full = self.col._renderQA(data)['q']
-        data = [1, 1, m['id'], 1, t['ord'], "", joinFields(b)]
+        data = [1, 1, m['id'], 1, t['ord'], "", joinFields(b), 0]
         # The html of the card at position ord where each field's content is the empty string ""
         empty = self.col._renderQA(data)['q']
 

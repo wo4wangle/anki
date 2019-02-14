@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright: Damien Elmes <anki@ichi2.net>
+# Copyright: Ankitects Pty Ltd and contributors
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 import pprint
@@ -670,7 +670,7 @@ where c.nid = n.id and c.id in %s group by nid""" % ids2str(cids)):
         TODO comment better
 
         """
-        cid, nid, mid, did, ord, tags, flds = data
+        cid, nid, mid, did, ord, tags, flds, cardFlags = data
         flist = splitFields(flds)#the list of fields
         fields = {} #
         #name -> ord for each field, tags
@@ -729,14 +729,20 @@ where c.nid = n.id and c.id in %s group by nid""" % ids2str(cids)):
         return d
 
     def _qaData(self, where=""):
-        """The list of [cid, nid, mid, did, ord, tags, flds] for each pair cards satisfying where.
+        """The list of [cid, nid, mid, did, ord, tags, flds, cardFlags] for each pair cards satisfying where.
 
         Where should start with an and."""
         return self.db.execute("""
-select c.id, f.id, f.mid, c.did, c.ord, f.tags, f.flds
+select c.id, f.id, f.mid, c.did, c.ord, f.tags, f.flds, c.flags
 from cards c, notes f
 where c.nid == f.id
 %s""" % where)
+
+    def _flagNameFromCardFlags(self, flags):
+        flag = flags & 0b111
+        if not flag:
+            return ""
+        return "flag%d" % flag
 
     # Finding cards
     ##########################################################################
@@ -998,9 +1004,14 @@ and type = 0""", intTime(), self.usn())
                 % ids2str(ids), self.sched.today, intTime(), self.usn())
         # v2 sched had a bug that could create decimal intervals
         curs = self.db.cursor()
-        curs.execute("update cards set ivl=round(ivl) where ivl!=round(ivl)")
+
+        curs.execute("update cards set ivl=round(ivl),due=round(due) where ivl!=round(ivl) or due!=round(due)")
         if curs.rowcount:
-            problems.append("Fixed %d cards with v2 scheduler decimal interval bug." % curs.rowcount)
+            problems.append("Fixed %d cards with v2 scheduler bug." % curs.rowcount)
+
+        curs.execute("update revlog set ivl=round(ivl),lastIvl=round(lastIvl) where ivl!=round(ivl) or lastIvl!=round(lastIvl)")
+        if curs.rowcount:
+            problems.append("Fixed %d review history entries with v2 scheduler bug." % curs.rowcount)
         # and finally, optimize
         self.optimize()
         newSize = os.stat(self.path)[stat.ST_SIZE]
@@ -1069,5 +1080,5 @@ and type = 0""", intTime(), self.usn())
 
     def setUserFlag(self, flag, cids):
         assert 0 <= flag <= 7
-        self.db.execute("update cards set flags = (flags & ~?) | ? where id in %s" %
-                        ids2str(cids), 0b111, flag)
+        self.db.execute("update cards set flags = (flags & ~?) | ?, usn=?, mod=? where id in %s" %
+                        ids2str(cids), 0b111, flag, self._usn, intTime())

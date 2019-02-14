@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright: Damien Elmes <anki@ichi2.net>
+# Copyright: Ankitects Pty Ltd and contributors
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 """
 The part of the window used to edit notes. It is used for adding
@@ -27,7 +27,7 @@ from anki.hooks import runHook, runFilter, addHook
 from aqt.sound import getAudio
 from aqt.webview import AnkiWebView
 from aqt.utils import shortcut, showInfo, showWarning, getFile, \
-    openHelp, tooltip, downArrow
+    openHelp, tooltip, downArrow, qtMenuShortcutWorkaround
 import aqt
 from bs4 import BeautifulSoup
 import requests
@@ -801,6 +801,9 @@ to a cloze type first, via Edit>Change Note Type."""))
         a = m.addAction(_("Edit HTML"))
         a.triggered.connect(self.onHtmlEdit)
         a.setShortcut(QKeySequence("Ctrl+Shift+X"))
+
+        qtMenuShortcutWorkaround(m)
+
         m.exec_(QCursor.pos())
 
     # LaTeX
@@ -959,7 +962,10 @@ class EditorWebView(AnkiWebView):
 
         # normal text; convert it to HTML
         txt = html.escape(txt)
-        txt = txt.replace("\n", "<br>")
+        txt = txt.replace("\n", "<br>")\
+            .replace("\t", " "*4)\
+            .replace(" ", "&nbsp;")
+
         return txt
 
     def _processHtml(self, mime):
