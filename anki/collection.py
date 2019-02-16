@@ -492,9 +492,9 @@ insert into cards values (?,?,?,?,?,?,0,0,?,0,0,0,0,0,0,0,0,"")""",
     def previewCards(self, note, type=0):
         """Returns a list of new cards, one by template. Those cards are not flushed, and their due is always 1.
 
-        type 0 - when previewing in add dialog, only non-empty
-        type 1 - when previewing edit, only existing
-        type 2 - when previewing in models dialog, all templates.
+        type 0 - when previewing in add dialog, only non-empty. Seems to be used only in tests.
+        type 1 - when previewing edit, only existing. Seems to be used only in tests.
+        type 2 - when previewing in models dialog (i.e. note type modifier), return the list of cards for every single template of the model.
         """
         #cms is the list of templates to consider
         if type == 0:
